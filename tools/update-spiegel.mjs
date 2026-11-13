@@ -47,7 +47,8 @@ function languageForFile(relPath) {
     '.css': 'css',
     '.json': 'json',
     '.svg': 'xml',
-    '.sh': 'bash'
+    '.sh': 'bash',
+    '.command': 'bash'
   };
   return map[ext] ?? 'text';
 }

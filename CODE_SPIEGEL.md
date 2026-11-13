@@ -36,6 +36,7 @@ Die Anwendung ist eine leichtgewichtige Progressive Web App (PWA) für das iPhon
 - **`icon.svg`**: Quadratisches Vektor-App-Icon (`512x512` mit `x²`-Motiv auf dunklem Grund).
 - **`CODE_SPIEGEL.md`**: Synchronisierter Volltext-Spiegel der Kerndateien im Projektordner für schnellen Kontextabgleich und externe Reviews. Wird vor jedem Commit automatisch über `tools/update-spiegel.mjs` aktualisiert.
 - **`tools/update-spiegel.mjs` & Git-Hooks**: Erstellt `CODE_SPIEGEL.md` neu (`--code`, eingebunden in `.git/hooks/pre-commit`) und spiegelt den Projektordner per `rsync` ohne `.git/` und `node_modules/` nach Google Drive (`--drive`, eingebunden in `.git/hooks/post-commit`). Zusätzlich läuft der zentrale Mac-Spiegel `drive-spiegel.sh` um 09:00 und 19:00 Uhr.
+- **`Start-Lokal.command`**: Ausführbarer Doppelklick-Starter für den macOS Finder. Wechselt in `/Users/benkovert/kopfrechen-pwa`, prüft Port `8080`, startet bei Bedarf `python3 -m http.server 8080` im Hintergrund und öffnet `http://localhost:8080` im Standardbrowser.
 
 ---
 
@@ -154,6 +155,15 @@ Qualitätssicherung (lokal & vor jedem Push):
 - **Semantische `data-*`-Brücke**: Einzige Schnittstelle zwischen `ui.js` und CSS in `index.html` für visuelle Zustände (`data-screen`, `data-state`, `data-feedback`, `data-empty`, `data-visible`).
 - **`sw.js` (Offline-Cache)**: Arbeitet entkoppelt im Service-Worker-Kontext; wird von `ui.js` einmalig beim Start registriert und liefert zwischengespeicherte Dateien bei fehlendem Netz.
 - **`tests.mjs`**: Importiert ausschließlich `engine.js` und `storage.js` und liest geschützte Projektdateien statisch ein, um Architekturverstöße sofort sichtbar zu machen.
+
+---
+
+## 5. Entwicklungs-Phasen (Roadmap)
+
+- **Phase 1: Fundament & Gehärteter Prototyp V1.1** (erledigt)
+- **Phase 2: Didaktik & Trainings-Feinschliff V1.2** (Fehler-Rückblick mit Lösungen auf dem Endbildschirm, Kategorie-Auswahl vor Spielstart)
+- **Phase 3: Echtes Cloud-Backend V2.0** (Umbau von `storage.js` auf Supabase nach Abschluss von Phase 2)
+- **Phase 4: Langzeit-Statistik oder Native Swift-App V3.0** (Backlog)
 ````
 
 ## AGENTS.md
@@ -2022,7 +2032,8 @@ function languageForFile(relPath) {
     '.css': 'css',
     '.json': 'json',
     '.svg': 'xml',
-    '.sh': 'bash'
+    '.sh': 'bash',
+    '.command': 'bash'
   };
   return map[ext] ?? 'text';
 }
@@ -2183,4 +2194,47 @@ if (isDirectRun) {
     process.exit(1);
   });
 }
+```
+
+## Start-Lokal.command
+
+```bash
+#!/bin/bash
+set -u
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+PROJECT_DIR="/Users/benkovert/kopfrechen-pwa"
+PORT=8080
+URL="http://localhost:$PORT"
+LOG_FILE="/tmp/kopfrechen-pwa-server.log"
+
+cd "$PROJECT_DIR" || {
+  echo "Fehler: Ordner $PROJECT_DIR wurde nicht gefunden."
+  exit 1
+}
+
+if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Lokaler Webserver auf Port $PORT läuft bereits."
+else
+  echo "Starte lokalen Webserver in $PROJECT_DIR auf Port $PORT..."
+  nohup python3 -m http.server "$PORT" >"$LOG_FILE" 2>&1 </dev/null &
+  SERVER_PID=$!
+
+  i=0
+  while [ "$i" -lt 20 ]; do
+    if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+      break
+    fi
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      echo "Fehler: Webserver konnte nicht gestartet werden. Details in $LOG_FILE"
+      exit 1
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+fi
+
+echo "Öffne $URL im Standardbrowser..."
+open "$URL"
 ```
