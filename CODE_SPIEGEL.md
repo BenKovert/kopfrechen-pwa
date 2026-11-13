@@ -195,6 +195,11 @@ Jeder abgeschlossene Arbeitsschritt endet ausnahmslos mit folgender Abfolge:
 node_modules/
 ```
 
+## .nojekyll
+
+```text
+```
+
 ## storage.js
 
 ```javascript
