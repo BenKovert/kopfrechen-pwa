@@ -27,7 +27,8 @@ Die Anwendung ist eine leichtgewichtige Progressive Web App (PWA) für das iPhon
 - **`sw.js`**: Service Worker (`CACHE_NAME = 'kopfrechen-v2'`). Cached bei Installation die App-Shell (`./`, `./index.html`, `./ui.js`, `./engine.js`, `./storage.js`, `./manifest.json`, `./icon.svg`) sowie bestmöglich `https://cdn.tailwindcss.com` per `no-cors`-Fetch (`res.ok || res.type === 'opaque'`, abgesichert in `try/catch`). Nutzt für `https://cdn.tailwindcss.com` Cache-First / Stale-While-Revalidate mit Hintergrund-Update und für lokale `GET`-Anfragen Network-First (`ok && type === 'basic'`) mit Offline-Cache-Fallback.
 - **`manifest.json`**: Web App Manifest für die Installation auf dem Homescreen (`display: "standalone"`, `orientation: "portrait"`, `start_url: "./index.html"`, Farben `#020617`).
 - **`icon.svg`**: Quadratisches Vektor-App-Icon (`512x512` mit `x²`-Motiv auf dunklem Grund).
-- **`CODE_SPIEGEL.md`**: Synchronisierter Volltext-Spiegel der Kerndateien im Projektordner für schnellen Kontextabgleich und externe Reviews.
+- **`CODE_SPIEGEL.md`**: Synchronisierter Volltext-Spiegel der Kerndateien im Projektordner für schnellen Kontextabgleich und externe Reviews. Wird vor jedem Commit automatisch über `tools/update-spiegel.mjs` aktualisiert.
+- **`tools/update-spiegel.mjs` & Git-Hooks**: Erstellt `CODE_SPIEGEL.md` neu (`--code`, eingebunden in `.git/hooks/pre-commit`) und spiegelt den Projektordner per `rsync` ohne `.git/` und `node_modules/` nach Google Drive (`--drive`, eingebunden in `.git/hooks/post-commit`). Zusätzlich läuft der zentrale Mac-Spiegel `drive-spiegel.sh` um 09:00 und 19:00 Uhr.
 
 ---
 
@@ -83,9 +84,10 @@ Ab sofort gilt nach jeder Änderung am Projekt eine feste Abschlussreihenfolge. 
 1. **Grüne Tests**: `node --test tests.mjs` im Projektordner ausführen. Alle Tests müssen ohne Fehler und ohne übersprungene Prüfungen bestehen.
 2. **Sauberer Git-Commit**: Alle geänderten Dateien stagen und mit einer verständlichen deutschen oder englischen Commit-Message committen.
 3. **Sofortiger Push**: `git push` direkt auf `origin main` (GitHub) ausführen.
-4. **`CODE_SPIEGEL.md` synchronisieren**: Die Volltext-Spiegeldatei `CODE_SPIEGEL.md` im Projekt auf den aktuellen Stand der Kerndateien bringen (und bei Bedarf mit committen/pushen).
-5. **Google-Drive-Spiegel synchronisieren**: Den kompletten Projektstand in das Spiegelverzeichnis übertragen:
+4. **`CODE_SPIEGEL.md` synchronisieren**: Die Volltext-Spiegeldatei `CODE_SPIEGEL.md` im Projekt wird beim Commit automatisch durch `.git/hooks/pre-commit` (`node tools/update-spiegel.mjs --code`) aktualisiert und mitgestaged.
+5. **Google-Drive-Spiegel synchronisieren**: Nach dem Commit überträgt `.git/hooks/post-commit` (`node tools/update-spiegel.mjs --drive`) den Projektstand automatisch ohne `.git/` und `node_modules/` nach:
    `~/Library/CloudStorage/GoogleDrive-kovertben@gmail.com/Meine Ablage/KI-Spiegel/kopfrechen-pwa/`
+   Zusätzlich prüft und spiegelt der zentrale `drive-spiegel.sh` täglich um 09:00 und 19:00 Uhr. Manueller Komplettlauf bei Bedarf: `node tools/update-spiegel.mjs`.
 
 ---
 

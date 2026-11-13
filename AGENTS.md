@@ -25,5 +25,7 @@ Jeder abgeschlossene Arbeitsschritt endet ausnahmslos mit folgender Abfolge:
    Alle Tests müssen grün durchlaufen (0 Fehler, keine übersprungenen Prüfungen).
 2. **GitHub Commit und Push**:
    Sauberen Git-Commit mit verständlicher deutscher oder englischer Commit-Message erstellen und sofort `git push` auf `origin main` ausführen.
-3. **Spiegel synchronisieren**:
-   Direkt nach dem Commit/Push werden `CODE_SPIEGEL.md` im Projektordner und der Google-Drive-Spiegel (`~/Library/CloudStorage/GoogleDrive-kovertben@gmail.com/Meine Ablage/KI-Spiegel/kopfrechen-pwa/`) auf den aktuellen Stand gebracht.
+3. **Automatische Spiegelung über Git-Hooks (`tools/update-spiegel.mjs`)**:
+   - `.git/hooks/pre-commit` baut `CODE_SPIEGEL.md` bei jedem Commit automatisch neu auf (`--code`) und führt `git add CODE_SPIEGEL.md` aus.
+   - `.git/hooks/post-commit` spiegelt das Projekt nach jedem Commit per `rsync` ohne `.git/` und `node_modules/` nach `~/Library/CloudStorage/GoogleDrive-kovertben@gmail.com/Meine Ablage/KI-Spiegel/kopfrechen-pwa/` (`--drive`); optionaler Hintergrund-Push über `git config kopfrechen.autoPush true`.
+   - Zusätzlich sichert der zentrale `drive-spiegel.sh` das Projekt um 09:00 und 19:00 Uhr. Manueller Abgleich bei Bedarf: `node tools/update-spiegel.mjs`.
