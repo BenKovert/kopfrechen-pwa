@@ -17,20 +17,20 @@ Die Anwendung ist eine leichtgewichtige Progressive Web App (PWA) für das iPhon
 ### Die 4 Hauptbausteine
 
 1. **`storage.js` (Datenschicht)**
-   Kapselt das Lesen und Schreiben des Nutzerprofils hinter den asynchronen Funktionen `loadUserData()` und `saveUserData(data)`. Aktuell wird `globalThis.localStorage` unter dem Schlüssel `kopfrechen_user_data_v1` verwendet. Durch die asynchrone Schnittstelle lässt sich der Speicher später ohne Umbau von `engine.js` oder `ui.js` auf ein Backend (z. B. Supabase) umstellen.
+   Kapselt alle Zugriffe auf `globalThis.localStorage` und trennt Persistenz strikt von Spiellogik und DOM. Das Nutzerprofil (`streak`, `highScore`, `lastPlayedDate`) bleibt unter `kopfrechen_user_data_v1` hinter den asynchronen Funktionen `loadUserData()` und `saveUserData(data)` gekapselt, damit sich der Speicher später ohne Umbau von `engine.js` oder `ui.js` auf ein Backend (z. B. Supabase) umstellen lässt. Seit V1.2 (Phase 2 Teil 1) verwaltet `storage.js` zusätzlich Themen-Gewichte unter `kopfrechen_weights_v1` (`TOPIC_IDS`, `getWeights()`, `adjustWeight(topicId, outcome)`, `getTopGaps(limit = 3)`) und Multi-Timer-Highscores unter `kopfrechen_highscores_v1` (`HIGHSCORE_DURATIONS`, `getHighScores()`, `getHighScore(durationSeconds = 60)`, `saveHighScore(score, durationSeconds = 60)`).
 
 2. **`engine.js` (Logikschicht / Headless Core)**
-   Reines JavaScript für alle fachlichen Regeln ohne Browser-Bezug. Definiert die Spieldauer (`GAME_DURATION_SECONDS = 60`), die vier Aufgabenkategorien (`CATEGORIES`: `Quadratzahlen` bis `25²`, `Potenzen`, `Lineare Gleichungen`, `Prozentrechnung`) und 10 Fun-Facts (`MATH_FUN_FACTS`). Stellt `getDifficultyForScore`, `generateQuestion`, `checkAnswer`, `getLocalDateString`, `updateUserProfile` und `getRandomFunFact` bereit.
+   Reines JavaScript für alle fachlichen Regeln ohne Browser- oder Speicherbezug. Für V1.1 bleiben `GAME_DURATION_SECONDS = 60`, die vier Aufgabenkategorien (`CATEGORIES`: `Quadratzahlen` bis `25²`, `Potenzen`, `Lineare Gleichungen`, `Prozentrechnung`), 10 Fun-Facts (`MATH_FUN_FACTS`), `getDifficultyForScore`, `generateQuestion`, `checkAnswer`, `getLocalDateString`, `updateUserProfile` und `getRandomFunFact` vollständig erhalten. Seit V1.2 (Phase 2 Teil 1) stellt `engine.js` zusätzlich alle 11 Kurs-Themen (`TOPICS`), die vier Zeitstufen (`TIMER_DURATIONS = [60, 120, 300, 600]`), Themen- und gewichtete Generatoren mit Lösungswegen (`generateTopicQuestion`, `generateWeightedQuestion`, `pickTopic`) sowie Session-History und PPM-Auswertung (`createSessionHistory`, `createHistoryEntry`, `recordSessionAnswer`, `setHistoryGap`, `calculatePpm`, `summarizeSession`) bereit.
 
 3. **`ui.js` (Präsentationsschicht)**
-   Verbindet `index.html`, `engine.js` und `storage.js`. Verwaltet den Sitzungszustand (`isPlaying`, `timeLeft`, `timerId`, `score`, `attempts`, `currentQuestion`, `inputBuffer`, `userProfile`), bindet Klick- und Tastatur-Events (`#btn-start`, `#btn-replay`, `#btn-home`, `#keypad`, `keydown`), steuert das 1-Sekunden-Timer-Intervall, registriert den Service Worker (`./sw.js`) und überträgt Spielzustände ausschließlich über Textinhalte, funktionale Progress-Werte und semantische `data-*`-Attribute in das DOM.
+   Verbindet `index.html`, `engine.js` und `storage.js`. Verwaltet den Sitzungszustand (`isPlaying`, `timeLeft`, `timerId`, `score`, `attempts`, `currentQuestion`, `inputBuffer`, `userProfile`), bindet Klick- und Tastatur-Events (`#btn-start`, `#btn-replay`, `#btn-home`, `#keypad`, `keydown`), steuert das 1-Sekunden-Timer-Intervall, registriert den Service Worker (`./sw.js`) und überträgt Spielzustände ausschließlich über Textinhalte, funktionale Progress-Werte und semantische `data-*`-Attribute in das DOM. In Phase 2 Teil 1 bleibt `ui.js` unverändert; die Anbindung der neuen V1.2-Funktionen folgt in Phase 2 Teil 2.
 
 4. **`index.html` (Struktur, PWA-Meta und Defensives CSS)**
-   Enthält die semantische HTML-Struktur für die drei Ansichten (`#screen-start`, `#screen-game`, `#screen-end`), die iOS/PWA-Metadaten (`viewport-fit=cover`, `apple-mobile-web-app-capable`), den zentralen `<style>`-Block für Layout, Fallbacks und Zustandsübersetzung sowie den Module-Einstiegspunkt `<script type="module" src="./ui.js"></script>`.
+   Enthält die semantische HTML-Struktur für die drei Ansichten (`#screen-start`, `#screen-game`, `#screen-end`), die iOS/PWA-Metadaten (`viewport-fit=cover`, `apple-mobile-web-app-capable`), den zentralen `<style>`-Block für Layout, Fallbacks und Zustandsübersetzung sowie den Module-Einstiegspunkt `<script type="module" src="./ui.js"></script>`. In Phase 2 Teil 1 bleibt `index.html` unverändert; der UI-Umbau für Timer- und Themenwahl sowie Fehler-Rückblick folgt in Phase 2 Teil 2.
 
 ### Test-, PWA- und Spiegeldokumente
 
-- **`tests.mjs`**: Automatisierte Testsuite für `node --test tests.mjs`. Prüft neben den Rechen-, Streak- und Speicherfunktionen per Quelltext-Analyse auch die Einhaltung der Architektur-Gesetze (Headless Core, Storage-Kapselung, State-Driven UI und Defensives CSS).
+- **`tests.mjs`**: Automatisierte Testsuite für `node --test tests.mjs`. Prüft neben den V1.1- und V1.2-Verträgen in `engine.js` und `storage.js` (Rechen-, Themen-, Gewichtungs-, History-, Highscore- und Streak-Funktionen) per Quelltext-Analyse auch die Einhaltung der Architektur-Gesetze (Headless Core, Storage-Kapselung, State-Driven UI und Defensives CSS).
 - **`sw.js`**: Service Worker (`CACHE_NAME = 'kopfrechen-v2'`). Cached bei Installation die App-Shell (`./`, `./index.html`, `./ui.js`, `./engine.js`, `./storage.js`, `./manifest.json`, `./icon.svg`) sowie bestmöglich `https://cdn.tailwindcss.com` per `no-cors`-Fetch (`res.ok || res.type === 'opaque'`, abgesichert in `try/catch`). Nutzt für `https://cdn.tailwindcss.com` Cache-First / Stale-While-Revalidate mit Hintergrund-Update und für lokale `GET`-Anfragen Network-First (`ok && type === 'basic'`) mit Offline-Cache-Fallback.
 - **`manifest.json`**: Web App Manifest für die Installation auf dem Homescreen (`display: "standalone"`, `orientation: "portrait"`, `start_url: "./index.html"`, Farben `#020617`).
 - **`icon.svg`**: Quadratisches Vektor-App-Icon (`512x512` mit `x²`-Motiv auf dunklem Grund).
@@ -48,16 +48,50 @@ Die Anwendung ist eine leichtgewichtige Progressive Web App (PWA) für das iPhon
 
 - **Verbotene Bezeichner in `engine.js`**: `document`, `window`, `localStorage`, `querySelector`, `getElementById`.
 - **Reine Ein- und Ausgaben**: Funktionen nehmen schlichte Werte entgegen und geben saubere JSON-kompatible Objekte zurück (Zufallszahlen und Datum sind über `randomFn` und `todayStr` injizierbar).
-- **Aufgaben-Vertrag (`generateQuestion`)**: Liefert exakt `{ id, category, questionText, correctAnswer, difficulty }` mit ganzzahligem `correctAnswer >= 0` und `difficulty` im Bereich `1..3`.
+- **Rückwärtskompatibler Aufgaben-Vertrag V1.1 (`generateQuestion`)**: `generateQuestion(difficulty, randomFn)` bleibt unverändert bestehen und liefert exakt `{ id, category, questionText, correctAnswer, difficulty }` mit ganzzahligem `correctAnswer >= 0` und `difficulty` im Bereich `1..3` für die vier `CATEGORIES`. Ebenso bleiben `GAME_DURATION_SECONDS = 60`, `CATEGORIES`, `MATH_FUN_FACTS`, `getDifficultyForScore`, `checkAnswer` (unterstützt `correctAnswer` und `answer`), `getLocalDateString`, `updateUserProfile` und `getRandomFunFact` erhalten.
+- **V1.2 Kurs-Themen und Timer-Stufen**:
+  - `TIMER_DURATIONS`: Gefrorenes Array `[60, 120, 300, 600]` (in Sekunden).
+  - `TOPICS`: Gefrorenes Array mit allen 11 Kurs-Themen (`{ id, label }`):
+    - `de1_1`: `DE 1.1 Grundlagen`
+    - `de2_1`: `DE 2.1 Brüche (Grundlagen)`
+    - `de2_2`: `DE 2.2 Brüche (Fortgeschritten)`
+    - `de3_1`: `DE 3.1 Terme - Potenzgesetze`
+    - `de3_2`: `DE 3.2 Terme - Exponenten und Logarithmen`
+    - `de4_1`: `DE 4.1 Gleichungen`
+    - `de4_2`: `DE 4.2 Lineare Gleichungssysteme`
+    - `de5_1`: `DE 5.1 Funktionen (Geraden)`
+    - `de5_2`: `DE 5.2 Funktionen (Fortgeschritten)`
+    - `de6_1`: `DE 6.1 Technik - Trigonometrie am Dreieck`
+    - `de6_2`: `DE 6.2 Technik - Trigonometrische Funktionen`
+- **V1.2 Themen-Generatoren und gewichtete Auswahl**:
+  - API: `generateTopicQuestion(topicId, difficulty, randomFn)`, `generateWeightedQuestion(activeTopicIds, weights, difficulty, randomFn)`, `pickTopic(activeTopicIds, weights, randomFn)`.
+  - **Rückwärtskonstruktion**: Jede Themen-Aufgabe wird vom Ergebnis her so konstruiert, dass `answer` bzw. `correctAnswer` immer ganzzahlig und `>= 0` ist (über Zifferntasten `0` bis `9` eingebbar).
+  - **Pflichtfelder einer Themen-Aufgabe**: `{ id, topicId, topicLabel, category, question, questionText, text, answer, correctAnswer, difficulty, steps }`.
+  - **Lösungswege (`steps`)**: Array mit mindestens 2 kurzen, konkreten deutschen Lösungswegen genau für die erzeugten Zahlen der Aufgabe.
+  - **Gewichtete Auswahl**: `pickTopic` wählt unter Berücksichtigung von `weights` (Standardgewicht `1.0`) aus `activeTopicIds` (Standard: alle 11 Themen aus `TOPICS`; bei leerem Array `[]` Rückgabe `null`). `generateWeightedQuestion` kombiniert `pickTopic` und `generateTopicQuestion`.
+- **V1.2 Session-History und PPM**:
+  - API: `createSessionHistory()`, `createHistoryEntry(question, checkResult)`, `recordSessionAnswer(history, question, checkResult)`, `setHistoryGap(history, index, marked = true)`, `calculatePpm(correctCount, durationSeconds = GAME_DURATION_SECONDS)`, `summarizeSession(history, durationSeconds = GAME_DURATION_SECONDS)`.
+  - **Verlaufs-Eintrag (`createHistoryEntry`)**: `{ topicId, topicLabel, question, correctAnswer, userAnswer, isCorrect, steps, markedAsGap }`.
+  - **Auswertung**: `calculatePpm` liefert richtige Antworten pro Minute (auf 1 Nachkommastelle gerundet, `0` bei Dauer `<= 0`). `summarizeSession` liefert `{ total, correctCount, wrongCount, accuracyPercent, ppm, durationSeconds }`.
 
 ### Gesetz 2: Speicher-Kapselung (`storage.js`)
 
-`storage.js` verwaltet ausschließlich das Laden, Normalisieren und Speichern des Nutzerprofils.
+`storage.js` kapselt alle Zugriffe auf `globalThis.localStorage` (Nutzerprofil, Themen-Gewichte und Multi-Timer-Highscores) und ist frei von DOM-Zugriffen.
 
-- **Verbindliche Exports**: `async loadUserData()` und `async saveUserData(data)`.
-- **Verbindliches Datenmodell**: Exakt die drei Felder `streak` (Ganzzahl `>= 0`), `highScore` (Ganzzahl `>= 0`) und `lastPlayedDate` (`YYYY-MM-DD`-String oder `null`).
-- **Fehlertoleranz**: Altdaten mit kleingeschriebenem `highscore` werden beim Laden auf `highScore` migriert; defektes JSON oder ungültige Werte fallen sicher auf `{ streak: 0, highScore: 0, lastPlayedDate: null }` zurück.
-- **Verbot in `storage.js`**: Kein Zugriff auf `document`.
+- **Verbot in `storage.js`**: Kein Zugriff auf `document`, `querySelector` oder `getElementById`.
+- **Nutzerprofil V1.1 (rückwärtskompatibel, `kopfrechen_user_data_v1`)**:
+  - Verbindliche `async` Exports: `async loadUserData()` und `async saveUserData(data)`.
+  - Verbindliches Datenmodell: Exakt die drei Felder `streak` (Ganzzahl `>= 0`), `highScore` (Ganzzahl `>= 0`) und `lastPlayedDate` (`YYYY-MM-DD`-String oder `null`).
+  - Fehlertoleranz: Altdaten mit kleingeschriebenem `highscore` werden beim Laden auf `highScore` migriert; defektes JSON oder ungültige Werte fallen sicher auf `{ streak: 0, highScore: 0, lastPlayedDate: null }` zurück.
+- **Themen-Gewichte V1.2 (`kopfrechen_weights_v1`)**:
+  - API (synchron): `TOPIC_IDS` (11 Themen-IDs `de1_1` bis `de6_2`), `WEIGHT_DEFAULT` (`1.0`), `WEIGHT_MIN` (`1.0`), `WEIGHT_MAX` (`2.5`), `getWeights()`, `adjustWeight(topicId, outcome)`, `getTopGaps(limit = 3)`.
+  - Wertebereich und Rundung: Startwert `1.0`, Minimum `1.0`, Cap/Maximum `2.5`, Rundung auf 2 Nachkommastellen; fehlertolerant bei fehlendem oder kaputtem JSON.
+  - Gewichtsanpassung in `adjustWeight(topicId, outcome)`: `correct` `-0.05`, `wrong` `+0.15`, `gap` `+0.40` (begrenzt auf `[1.0, 2.5]`; unbekannte `topicId` lässt Gewichte unverändert).
+  - `getTopGaps(limit = 3)`: Liefert bis zu `limit` Themen-IDs mit Gewicht `> 1.0`, absteigend nach Gewicht sortiert (bei Gleichstand in Reihenfolge aus `TOPIC_IDS`).
+- **Multi-Timer-Highscores V1.2 (`kopfrechen_highscores_v1`)**:
+  - Zeitstufen: `HIGHSCORE_DURATIONS` für `60`, `120`, `300`, `600` Sekunden (Standard `60s`; `normalizeDuration(durationSeconds)` akzeptiert Zahlen oder numerische Strings innerhalb der 4 Stufen, ungültige Werte fallen auf `60` zurück).
+  - API (synchron): `HIGHSCORE_DURATIONS`, `normalizeDuration(durationSeconds)`, `getHighScores()`, `getHighScore(durationSeconds = 60)`, `saveHighScore(score, durationSeconds = 60)`.
+  - Kompatibilität zu `60s`: Fehlt für `60` Sekunden ein Eintrag in `kopfrechen_highscores_v1`, wird der `highScore` aus `kopfrechen_user_data_v1` übernommen; übertrifft `saveHighScore(score, 60)` den bisherigen `highScore` in `kopfrechen_user_data_v1`, wird auch dieser mitaktualisiert.
 
 ### Gesetz 3: State-Driven UI Gesetz (`ui.js`)
 
@@ -104,54 +138,66 @@ Ab sofort gilt nach jeder Änderung am Projekt eine feste Abschlussreihenfolge. 
 ### Abhängigkeits- und Datenflusskarte
 
 ```text
-+-------------------------------------------------------------------+
-|                           index.html                              |
-|  DOM (#screen-start, #screen-game, #screen-end, #keypad, ...)     |
-|  Defensives CSS (<style>: Fallbacks, 100dvh, min-height: 0,       |
-|  data-* Regeln) + <script type="module" src="./ui.js">            |
-+---------------------------------+---------------------------------+
-                                  |
-             lädt / liefert DOM   |   schreibt Text, width &
-             & Nutzer-Events      v   semantische data-* Attribute
-+-------------------------------------------------------------------+
-|                             ui.js                                 |
-|  Steuerung von Timer, Eingabepuffer, Events & Service Worker      |
-|  Verboten: Tailwind-Klassen, classList/className, localStorage    |
-+----------------+--------------------------------+-----------------+
-                 |                                |
-   importiert    |                                |   importiert
-   Pure Logik    v                                v   async Storage
-+---------------------------------+  +------------------------------+
-|           engine.js             |  |          storage.js          |
-|  Headless Core (reines JS)      |  |  async loadUserData()        |
-|  - generateQuestion()           |  |  async saveUserData(data)    |
-|  - checkAnswer()                |  |  Felder: streak, highScore,  |
-|  - updateUserProfile()          |  |          lastPlayedDate      |
-|  - getDifficultyForScore()      |  +--------------+---------------+
-|  - getRandomFunFact()           |                 |
-|  Keine externen Abhängigkeiten  |                 v
-+---------------------------------+        [ globalThis.localStorage ]
-                                           Key: kopfrechen_user_data_v1
++---------------------------------------------------------------------------------+
+|                                   index.html                                    |
+|  DOM (#screen-start, #screen-game, #screen-end, #keypad, ...)                   |
+|  Defensives CSS (<style>: Fallbacks, 100dvh, min-height: 0, data-* Regeln)      |
+|  + <script type="module" src="./ui.js">                                         |
+|  (Phase 2 Teil 1: unverändert; UI-Erweiterungen folgen in Phase 2 Teil 2)       |
++----------------------------------------+----------------------------------------+
+                                         |
+                    lädt / liefert DOM   |   schreibt Text, width &
+                    & Nutzer-Events      v   semantische data-* Attribute
++---------------------------------------------------------------------------------+
+|                                      ui.js                                      |
+|  Steuerung von Timer, Eingabepuffer, Events & Service Worker                    |
+|  Verboten: Tailwind-Klassen, classList/className, localStorage                  |
+|  (Phase 2 Teil 1: unverändert; V1.2-Anbindung folgt in Phase 2 Teil 2)          |
++---------------------+------------------------------------+----------------------+
+                      |                                    |
+        importiert    |                                    |   importiert
+        Pure Logik    v                                    v   Storage API
++----------------------------------------+  +-------------------------------------+
+|               engine.js                |  |             storage.js              |
+|  Headless Core (reines JS)             |  |  V1.1 (async):                      |
+|  V1.1:                                 |  |  - loadUserData(), saveUserData()   |
+|  - generateQuestion(), checkAnswer()   |  |    (streak, highScore,              |
+|  - updateUserProfile(),                |  |     lastPlayedDate)                 |
+|    getDifficultyForScore()             |  |  V1.2 Teil 1 (synchron):            |
+|  - getRandomFunFact()                  |  |  - TOPIC_IDS, getWeights(),         |
+|  V1.2 Teil 1:                          |  |    adjustWeight(), getTopGaps()     |
+|  - TOPICS (11 Themen de1_1..de6_2)     |  |  - HIGHSCORE_DURATIONS,             |
+|  - TIMER_DURATIONS ([60,120,300,600])  |  |    getHighScores(), getHighScore(), |
+|  - generateTopicQuestion()             |  |    saveHighScore()                  |
+|  - generateWeightedQuestion()          |  |  Kein document / keine DOM-Queries  |
+|  - pickTopic()                         |  +------------------+------------------+
+|  - Session-History & PPM (6 Exports)   |                     |
+|  Keine Browser-/Storage-Zugriffe       |                     v
++----------------------------------------+        [ globalThis.localStorage ]
+                                                  Keys:
+                                                  - kopfrechen_user_data_v1
+                                                  - kopfrechen_weights_v1
+                                                  - kopfrechen_highscores_v1
 
 Parallel im Browser-Hintergrund:
-+-------------------------------------------------------------------+
-|                             sw.js                                 |
-|  Service Worker (kopfrechen-v2): Offline-Cache für App-Shell      |
-|  (Network-First lokal, Cache-First/SWR für Tailwind CDN)          |
-+-------------------------------------------------------------------+
++---------------------------------------------------------------------------------+
+|                                      sw.js                                      |
+|  Service Worker (kopfrechen-v2): Offline-Cache für App-Shell                    |
+|  (Network-First lokal, Cache-First/SWR für Tailwind CDN)                        |
++---------------------------------------------------------------------------------+
 
 Qualitätssicherung (lokal & vor jedem Push):
-+-------------------------------------------------------------------+
-|                           tests.mjs                               |
-|  node --test tests.mjs: testet engine.js + storage.js funktional  |
-|  und prüft Quelltext-Gesetze in engine.js, storage.js, ui.js,     |
-|  index.html                                                       |
-+-------------------------------------------------------------------+
++---------------------------------------------------------------------------------+
+|                                    tests.mjs                                    |
+|  node --test tests.mjs: testet V1.1- und V1.2-Verträge in engine.js +           |
+|  storage.js (11 Themen, Gewichte, Session-History, Multi-Timer-Highscores)      |
+|  und prüft Quelltext-Gesetze in engine.js, storage.js, ui.js, index.html        |
++---------------------------------------------------------------------------------+
 ```
 
 ### Legende
 
-- **`A -> B` / vertikale Pfeile**: Abhängigkeits-Einbahnstraße. `index.html` bindet `ui.js` ein; `ui.js` importiert `engine.js` und `storage.js`. Rückwärts-Abhängigkeiten sind verboten (`engine.js` kennt weder `ui.js` noch `storage.js` oder das DOM; `storage.js` kennt weder `ui.js` noch `engine.js` oder `document`).
+- **`A -> B` / vertikale Pfeile**: Abhängigkeits-Einbahnstraße. `index.html` bindet `ui.js` ein; `ui.js` importiert `engine.js` und `storage.js` (die neuen V1.2-Schnittstellen werden in Phase 2 Teil 2 in `ui.js` und `index.html` angebunden). Rückwärts-Abhängigkeiten sind verboten (`engine.js` kennt weder `ui.js` noch `storage.js` oder das DOM; `storage.js` kennt weder `ui.js` noch `engine.js` oder `document`).
 - **Semantische `data-*`-Brücke**: Einzige Schnittstelle zwischen `ui.js` und CSS in `index.html` für visuelle Zustände (`data-screen`, `data-state`, `data-feedback`, `data-empty`, `data-visible`).
 - **`sw.js` (Offline-Cache)**: Arbeitet entkoppelt im Service-Worker-Kontext; wird von `ui.js` einmalig beim Start registriert und liefert zwischengespeicherte Dateien bei fehlendem Netz.
 - **`tests.mjs`**: Importiert ausschließlich `engine.js` und `storage.js` und liest geschützte Projektdateien statisch ein, um Architekturverstöße sofort sichtbar zu machen.
@@ -161,7 +207,9 @@ Qualitätssicherung (lokal & vor jedem Push):
 ## 5. Entwicklungs-Phasen (Roadmap)
 
 - **Phase 1: Fundament & Gehärteter Prototyp V1.1** (erledigt)
-- **Phase 2: Didaktik & Trainings-Feinschliff V1.2** (Fehler-Rückblick mit Lösungen auf dem Endbildschirm, Kategorie-Auswahl vor Spielstart)
+- **Phase 2: Didaktik & Trainings-Feinschliff V1.2**
+  - **Teil 1 (Headless-Kern & Speicher, umgesetzt)**: 11 Kurs-Themen (`de1_1` bis `de6_2`), gewichtete Themen-Priorisierung, Lösungswege (`steps`), Session-History mit PPM-Auswertung sowie Multi-Timer-Highscores in `storage.js`, `engine.js` und `tests.mjs`.
+  - **Teil 2 (UI-Integration, nächster Schritt)**: Integration in `index.html` und `ui.js` (Timer- und Themenwahl auf dem Startbildschirm, Fehler-Rückblick mit Lösungswegen und Lücken-Markierung auf dem Endbildschirm).
 - **Phase 3: Echtes Cloud-Backend V2.0** (Umbau von `storage.js` auf Supabase nach Abschluss von Phase 2)
 - **Phase 4: Langzeit-Statistik oder Native Swift-App V3.0** (Backlog)
 ````
@@ -219,17 +267,79 @@ node_modules/
 ```javascript
 /**
  * Datenschicht (Storage Layer)
- * Verwaltet ausschließlich das Lesen und Schreiben des Nutzerprofils.
- * Aktuell über LocalStorage, gekapselt hinter async-Funktionen für späteren Backend-Tausch (z. B. Supabase).
+ * Verwaltet Nutzerprofil, Themen-Gewichte und Multi-Timer-Highscores.
+ * Aktuell über globalThis.localStorage, gekapselt für späteren Backend-Tausch (z. B. Supabase).
  */
 
 const STORAGE_KEY = 'kopfrechen_user_data_v1';
+const WEIGHTS_STORAGE_KEY = 'kopfrechen_weights_v1';
+const HIGHSCORES_STORAGE_KEY = 'kopfrechen_highscores_v1';
+
+export const TOPIC_IDS = Object.freeze([
+  'de1_1',
+  'de2_1',
+  'de2_2',
+  'de3_1',
+  'de3_2',
+  'de4_1',
+  'de4_2',
+  'de5_1',
+  'de5_2',
+  'de6_1',
+  'de6_2'
+]);
+
+export const HIGHSCORE_DURATIONS = Object.freeze([60, 120, 300, 600]);
+
+export const WEIGHT_DEFAULT = 1.0;
+export const WEIGHT_MIN = 1.0;
+export const WEIGHT_MAX = 2.5;
+
+const DEFAULT_DURATION = 60;
+const TOPIC_ID_SET = new Set(TOPIC_IDS);
+const DURATION_SET = new Set(HIGHSCORE_DURATIONS);
+const WEIGHT_DELTAS = Object.freeze({
+  correct: -0.05,
+  wrong: 0.15,
+  gap: 0.4
+});
 
 const DEFAULT_USER_DATA = {
   streak: 0,
   highScore: 0,
   lastPlayedDate: null
 };
+
+/**
+ * Liest und parst einen JSON-Wert fehlertolerant aus localStorage.
+ * @param {string} key
+ * @returns {unknown}
+ */
+function readJsonFromStorage(key) {
+  try {
+    const serialized = globalThis.localStorage?.getItem(key);
+    if (!serialized) {
+      return null;
+    }
+    return JSON.parse(serialized);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Serialisiert und speichert einen Wert fehlertolerant in localStorage.
+ * @param {string} key
+ * @param {unknown} value
+ * @returns {void}
+ */
+function writeJsonToStorage(key, value) {
+  try {
+    globalThis.localStorage?.setItem(key, JSON.stringify(value));
+  } catch {
+    // Speicherfehler (z. B. privater Modus oder volles Kontingent) abfangen.
+  }
+}
 
 /**
  * Normalisiert geladene Profildaten auf ein sicheres Format.
@@ -252,20 +362,31 @@ function normalizeUserData(raw) {
 }
 
 /**
+ * Lädt das Nutzerprofil synchron aus localStorage.
+ * @returns {{ streak: number, highScore: number, lastPlayedDate: string | null }}
+ */
+function loadUserDataSync() {
+  const parsed = readJsonFromStorage(STORAGE_KEY);
+  return parsed ? normalizeUserData(parsed) : { ...DEFAULT_USER_DATA };
+}
+
+/**
+ * Speichert das Nutzerprofil synchron in localStorage.
+ * @param {{ streak: number, highScore: number, lastPlayedDate: string | null }} data
+ * @returns {{ streak: number, highScore: number, lastPlayedDate: string | null }}
+ */
+function saveUserDataSync(data) {
+  const normalized = normalizeUserData(data);
+  writeJsonToStorage(STORAGE_KEY, normalized);
+  return normalized;
+}
+
+/**
  * Lädt das Nutzerprofil asynchron aus dem Speicher.
  * @returns {Promise<{ streak: number, highScore: number, lastPlayedDate: string | null }>}
  */
 export async function loadUserData() {
-  try {
-    const serialized = globalThis.localStorage?.getItem(STORAGE_KEY);
-    if (!serialized) {
-      return { ...DEFAULT_USER_DATA };
-    }
-    const parsed = JSON.parse(serialized);
-    return normalizeUserData(parsed);
-  } catch {
-    return { ...DEFAULT_USER_DATA };
-  }
+  return loadUserDataSync();
 }
 
 /**
@@ -274,9 +395,193 @@ export async function loadUserData() {
  * @returns {Promise<{ streak: number, highScore: number, lastPlayedDate: string | null }>}
  */
 export async function saveUserData(data) {
-  const normalized = normalizeUserData(data);
-  globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  return normalized;
+  return saveUserDataSync(data);
+}
+
+/**
+ * Begrenzt ein Themen-Gewicht auf [WEIGHT_MIN, WEIGHT_MAX] und rundet auf 2 Nachkommastellen.
+ * @param {unknown} value
+ * @returns {number}
+ */
+function normalizeWeightValue(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return WEIGHT_DEFAULT;
+  }
+  const clamped = Math.min(WEIGHT_MAX, Math.max(WEIGHT_MIN, value));
+  return Math.round(clamped * 100) / 100;
+}
+
+/**
+ * Lädt die normalisierten Themen-Gewichte für alle 11 Themen-IDs aus TOPIC_IDS.
+ * Fehlende oder ungültige Einträge werden mit WEIGHT_DEFAULT (1.0) initialisiert.
+ * @returns {Record<string, number>}
+ */
+export function getWeights() {
+  const raw = readJsonFromStorage(WEIGHTS_STORAGE_KEY);
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const weights = {};
+
+  for (const topicId of TOPIC_IDS) {
+    weights[topicId] = normalizeWeightValue(source[topicId]);
+  }
+
+  return weights;
+}
+
+/**
+ * Passt das Gewicht eines Themas abhängig vom Ergebnis an und speichert es.
+ * Unbekannte Themen-IDs geben die unveränderten Gewichte zurück.
+ * @param {string} topicId
+ * @param {'correct' | 'wrong' | 'gap'} outcome
+ * @returns {Record<string, number>}
+ */
+export function adjustWeight(topicId, outcome) {
+  const weights = getWeights();
+  if (!TOPIC_ID_SET.has(topicId) || !Object.hasOwn(WEIGHT_DELTAS, outcome)) {
+    return weights;
+  }
+
+  weights[topicId] = normalizeWeightValue(weights[topicId] + WEIGHT_DELTAS[outcome]);
+  writeJsonToStorage(WEIGHTS_STORAGE_KEY, weights);
+  return weights;
+}
+
+/**
+ * Liefert die Themen-IDs mit Gewicht > WEIGHT_MIN absteigend sortiert (maximal limit).
+ * Bei Gleichstand entscheidet die Reihenfolge in TOPIC_IDS.
+ * @param {number} [limit=3]
+ * @returns {string[]}
+ */
+export function getTopGaps(limit = 3) {
+  if (typeof limit !== 'number' || Number.isNaN(limit) || limit <= 0) {
+    return [];
+  }
+
+  const maxCount = Math.floor(limit);
+  if (maxCount <= 0) {
+    return [];
+  }
+
+  const weights = getWeights();
+  return TOPIC_IDS
+    .filter((topicId) => weights[topicId] > WEIGHT_MIN)
+    .sort((a, b) => weights[b] - weights[a] || TOPIC_IDS.indexOf(a) - TOPIC_IDS.indexOf(b))
+    .slice(0, maxCount);
+}
+
+/**
+ * Normalisiert eine Spieldauer auf eine der erlaubten Zeitstufen (60, 120, 300, 600).
+ * Bei fehlendem oder ungültigem Wert wird 60 zurückgegeben.
+ * @param {unknown} durationSeconds
+ * @returns {number}
+ */
+export function normalizeDuration(durationSeconds) {
+  if (typeof durationSeconds !== 'number' && typeof durationSeconds !== 'string') {
+    return DEFAULT_DURATION;
+  }
+  if (typeof durationSeconds === 'string' && durationSeconds.trim() === '') {
+    return DEFAULT_DURATION;
+  }
+
+  const parsed = Number(durationSeconds);
+  return DURATION_SET.has(parsed) ? parsed : DEFAULT_DURATION;
+}
+
+/**
+ * Normalisiert einen Punktestand auf eine Ganzzahl >= 0.
+ * @param {unknown} score
+ * @returns {number}
+ */
+function normalizeScore(score) {
+  if (typeof score === 'boolean') {
+    return 0;
+  }
+  const numeric = Number(score);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.floor(numeric));
+}
+
+/**
+ * Prüft, ob ein gespeicherter Highscore-Wert eine gültige Ganzzahl >= 0 ist.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isValidStoredScore(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+/**
+ * Lädt die Highscores aller Zeitstufen (60, 120, 300, 600 Sekunden).
+ * Fehlt ein Eintrag für 60 Sekunden, wird ein vorhandener highScore aus dem Nutzerprofil übernommen.
+ * @returns {{ 60: number, 120: number, 300: number, 600: number }}
+ */
+export function getHighScores() {
+  const raw = readJsonFromStorage(HIGHSCORES_STORAGE_KEY);
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const highScores = {};
+
+  for (const duration of HIGHSCORE_DURATIONS) {
+    const key = String(duration);
+    const stored = Object.hasOwn(source, key) ? source[key] : undefined;
+    highScores[duration] = isValidStoredScore(stored) ? stored : 0;
+  }
+
+  const hasStored60 = Object.hasOwn(source, String(DEFAULT_DURATION))
+    && isValidStoredScore(source[String(DEFAULT_DURATION)]);
+  if (!hasStored60) {
+    highScores[DEFAULT_DURATION] = loadUserDataSync().highScore;
+  }
+
+  return highScores;
+}
+
+/**
+ * Liefert den gespeicherten Highscore für eine Zeitstufe (Standard 60 Sekunden).
+ * @param {unknown} [durationSeconds=60]
+ * @returns {number}
+ */
+export function getHighScore(durationSeconds = DEFAULT_DURATION) {
+  const normDuration = normalizeDuration(durationSeconds);
+  const highScores = getHighScores();
+  return highScores[normDuration];
+}
+
+/**
+ * Speichert einen neuen Highscore für eine Zeitstufe, falls er den bisherigen Wert übertrifft.
+ * Aktualisiert bei 60 Sekunden bei neuem Rekord auch highScore im Nutzerprofil.
+ * @param {unknown} score
+ * @param {unknown} [durationSeconds=60]
+ * @returns {{ durationSeconds: number, highScore: number, isNewHighScore: boolean, highScores: { 60: number, 120: number, 300: number, 600: number } }}
+ */
+export function saveHighScore(score, durationSeconds = DEFAULT_DURATION) {
+  const normDuration = normalizeDuration(durationSeconds);
+  const safeScore = normalizeScore(score);
+  const highScores = getHighScores();
+  const prevScore = highScores[normDuration];
+  const nextScore = Math.max(prevScore, safeScore);
+  const isNewHighScore = safeScore > prevScore;
+
+  highScores[normDuration] = nextScore;
+  writeJsonToStorage(HIGHSCORES_STORAGE_KEY, highScores);
+
+  if (normDuration === DEFAULT_DURATION) {
+    const userData = loadUserDataSync();
+    if (nextScore > userData.highScore) {
+      saveUserDataSync({
+        ...userData,
+        highScore: nextScore
+      });
+    }
+  }
+
+  return {
+    durationSeconds: normDuration,
+    highScore: nextScore,
+    isNewHighScore,
+    highScores: { ...highScores }
+  };
 }
 ```
 
@@ -291,12 +596,32 @@ export async function saveUserData(data) {
 
 export const GAME_DURATION_SECONDS = 60;
 
+export const TIMER_DURATIONS = Object.freeze([60, 120, 300, 600]);
+
 export const CATEGORIES = Object.freeze({
   SQUARES: 'Quadratzahlen',
   POWERS: 'Potenzen',
   LINEAR: 'Lineare Gleichungen',
   PERCENT: 'Prozentrechnung'
 });
+
+export const TOPICS = Object.freeze(
+  [
+    { id: 'de1_1', label: 'DE 1.1 Grundlagen' },
+    { id: 'de2_1', label: 'DE 2.1 Brüche (Grundlagen)' },
+    { id: 'de2_2', label: 'DE 2.2 Brüche (Fortgeschritten)' },
+    { id: 'de3_1', label: 'DE 3.1 Terme - Potenzgesetze' },
+    { id: 'de3_2', label: 'DE 3.2 Terme - Exponenten und Logarithmen' },
+    { id: 'de4_1', label: 'DE 4.1 Gleichungen' },
+    { id: 'de4_2', label: 'DE 4.2 Lineare Gleichungssysteme' },
+    { id: 'de5_1', label: 'DE 5.1 Funktionen (Geraden)' },
+    { id: 'de5_2', label: 'DE 5.2 Funktionen (Fortgeschritten)' },
+    { id: 'de6_1', label: 'DE 6.1 Technik - Trigonometrie am Dreieck' },
+    { id: 'de6_2', label: 'DE 6.2 Technik - Trigonometrische Funktionen' }
+  ].map((topic) => Object.freeze(topic))
+);
+
+const TOPIC_MAP = new Map(TOPICS.map((topic) => [topic.id, topic]));
 
 export const MATH_FUN_FACTS = Object.freeze([
   'Die Zahl 0 wurde in Indien erfunden und revolutionierte das Rechnen mit Stellenwerten.',
@@ -324,6 +649,19 @@ const SUPERSCRIPTS = {
   '9': '⁹'
 };
 
+const SUBSCRIPTS = {
+  '0': '₀',
+  '1': '₁',
+  '2': '₂',
+  '3': '₃',
+  '4': '₄',
+  '5': '₅',
+  '6': '₆',
+  '7': '₇',
+  '8': '₈',
+  '9': '₉'
+};
+
 let questionCounter = 0;
 
 /**
@@ -348,6 +686,30 @@ function toSuperscript(exp) {
 }
 
 /**
+ * Formatiert eine ganze Zahl als tiefgestellte Ziffernfolge.
+ * @param {number} num
+ * @returns {string}
+ */
+function toSubscript(num) {
+  return String(num)
+    .split('')
+    .map((ch) => SUBSCRIPTS[ch] ?? ch)
+    .join('');
+}
+
+/**
+ * Normalisiert den Rückgabewert einer Zufallsfunktion sicher auf [0, 1).
+ * @param {() => number} randomFn
+ * @returns {number}
+ */
+function safeRandom(randomFn = Math.random) {
+  const val = Number(randomFn());
+  if (!Number.isFinite(val) || val <= 0) return 0;
+  if (val >= 1) return 0.9999999999999999;
+  return val;
+}
+
+/**
  * Zufällige Ganzzahl im Bereich [min, max] inklusive.
  * @param {number} min
  * @param {number} max
@@ -355,7 +717,22 @@ function toSuperscript(exp) {
  * @returns {number}
  */
 function randomInt(min, max, randomFn = Math.random) {
-  return Math.floor(randomFn() * (max - min + 1)) + min;
+  return Math.floor(safeRandom(randomFn) * (max - min + 1)) + min;
+}
+
+/**
+ * Zufällige Ganzzahl in [min, max], die kein Vielfaches von 10 ist.
+ * @param {number} min
+ * @param {number} max
+ * @param {() => number} randomFn
+ * @returns {number}
+ */
+function randomNonTenInt(min, max, randomFn = Math.random) {
+  let n = randomInt(min, max, randomFn);
+  if (n % 10 === 0) {
+    n = n < max ? n + 1 : n - 1;
+  }
+  return n;
 }
 
 /**
@@ -366,8 +743,66 @@ function randomInt(min, max, randomFn = Math.random) {
  * @returns {T}
  */
 function pickRandom(items, randomFn = Math.random) {
-  return items[Math.floor(randomFn() * items.length)];
+  return items[Math.floor(safeRandom(randomFn) * items.length)];
 }
+
+/**
+ * Normalisiert die Schwierigkeitsstufe auf 1, 2 oder 3.
+ * @param {number} difficulty
+ * @returns {number}
+ */
+function normalizeDifficulty(difficulty = 1) {
+  return Math.min(3, Math.max(1, Math.floor(Number(difficulty) || 1)));
+}
+
+/**
+ * Größter gemeinsamer Teiler zweier positiver Ganzzahlen.
+ * @param {number} a
+ * @param {number} b
+ * @returns {number}
+ */
+function gcd(a, b) {
+  let x = Math.abs(a);
+  let y = Math.abs(b);
+  while (y !== 0) {
+    const t = y;
+    y = x % y;
+    x = t;
+  }
+  return x || 1;
+}
+
+/**
+ * Baut das einheitliche Aufgaben-Objekt für alle V1.2-Themen.
+ * @param {string} topicId
+ * @param {string} question
+ * @param {number} answer
+ * @param {number} difficulty
+ * @param {string[]} steps
+ */
+function buildTopicQuestion(topicId, question, answer, difficulty, steps) {
+  const topic = TOPIC_MAP.get(topicId);
+  const topicLabel = topic.label;
+  const safeAnswer = Math.max(0, Math.round(answer));
+
+  return {
+    id: createQuestionId(),
+    topicId,
+    topicLabel,
+    category: topicLabel,
+    question,
+    questionText: question,
+    text: question,
+    answer: safeAnswer,
+    correctAnswer: safeAnswer,
+    difficulty,
+    steps
+  };
+}
+
+// ---------------------------------------------------------------------------
+// V1.1 Klassische Generatoren (Rückwärtskompatibel für generateQuestion)
+// ---------------------------------------------------------------------------
 
 /**
  * Erzeugt eine Quadratzahl-Aufgabe bis maximal 25².
@@ -449,7 +884,7 @@ function generateLinearQuestion(difficulty, randomFn) {
   } else if (level === 2) {
     a = randomInt(2, 8, randomFn);
     x = randomInt(2, 12, randomFn);
-    const sign = randomFn() < 0.5 ? 1 : -1;
+    const sign = safeRandom(randomFn) < 0.5 ? 1 : -1;
     b = sign * randomInt(1, 15, randomFn);
     if (a * x + b < 1) {
       b = Math.abs(b);
@@ -457,7 +892,7 @@ function generateLinearQuestion(difficulty, randomFn) {
   } else {
     a = randomInt(3, 12, randomFn);
     x = randomInt(2, 15, randomFn);
-    const sign = randomFn() < 0.5 ? 1 : -1;
+    const sign = safeRandom(randomFn) < 0.5 ? 1 : -1;
     b = sign * randomInt(2, 25, randomFn);
     if (a * x + b < 1) {
       b = Math.abs(b);
@@ -523,6 +958,1135 @@ function generatePercentQuestion(difficulty, randomFn) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// V1.2 Themen-Generatoren (11 Kurs-Module mit Lösungswegen)
+// ---------------------------------------------------------------------------
+
+/**
+ * DE 1.1 Grundlagen: Addition, Subtraktion, Multiplikation und Division im Kopf.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe1_1(difficulty, randomFn) {
+  const op = pickRandom(['add', 'sub', 'mul', 'div'], randomFn);
+
+  if (op === 'add') {
+    const ranges = {
+      1: [12, 49, 11, 39],
+      2: [35, 89, 24, 79],
+      3: [125, 489, 46, 289]
+    };
+    const [aMin, aMax, bMin, bMax] = ranges[difficulty];
+    const a = randomNonTenInt(aMin, aMax, randomFn);
+    const b = randomNonTenInt(bMin, bMax, randomFn);
+    const ans = a + b;
+    const bUnits = b % 10;
+    const bRest = b - bUnits;
+    const toTen = 10 - (a % 10);
+
+    return buildTopicQuestion(
+      'de1_1',
+      `${a} + ${b} = ?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Stellenweise): ${a} + ${bRest} = ${a + bRest}, dann + ${bUnits} = ${ans}.`,
+        `Weg 2 (Zehner voll machen): ${a} + ${toTen} = ${a + toTen}, restliche + ${b - toTen} = ${ans}.`
+      ]
+    );
+  }
+
+  if (op === 'sub') {
+    const ranges = {
+      1: [11, 34, 12, 49],
+      2: [23, 68, 16, 84],
+      3: [46, 185, 48, 285]
+    };
+    const [bMin, bMax, ansMin, ansMax] = ranges[difficulty];
+    const b = randomNonTenInt(bMin, bMax, randomFn);
+    const ans = randomNonTenInt(ansMin, ansMax, randomFn);
+    const a = ans + b;
+    const bUnits = b % 10;
+    const bRest = b - bUnits;
+    const midTen = Math.ceil(b / 10) * 10;
+
+    return buildTopicQuestion(
+      'de1_1',
+      `${a} - ${b} = ?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Schrittweise): ${a} - ${bRest} = ${a - bRest}, dann - ${bUnits} = ${ans}.`,
+        `Weg 2 (Ergänzen): Von ${b} bis ${midTen} sind es ${midTen - b}, von ${midTen} bis ${a} noch ${a - midTen}, Summe = ${ans}.`
+      ]
+    );
+  }
+
+  if (op === 'mul') {
+    const a = difficulty === 1
+      ? randomInt(3, 9, randomFn)
+      : difficulty === 2
+        ? randomInt(4, 9, randomFn)
+        : randomNonTenInt(6, 14, randomFn);
+    const b = difficulty === 1
+      ? randomNonTenInt(12, 19, randomFn)
+      : difficulty === 2
+        ? randomNonTenInt(22, 49, randomFn)
+        : randomNonTenInt(23, 68, randomFn);
+    const ans = a * b;
+    const bUnits = b % 10;
+    const bRest = b - bUnits;
+
+    let step2;
+    if (a % 2 === 0) {
+      step2 = `Weg 2 (Halbieren und Verdoppeln): (${a} : 2) · (${b} · 2) = ${a / 2} · ${b * 2} = ${ans}.`;
+    } else if (b % 2 === 0) {
+      step2 = `Weg 2 (Verdoppeln und Halbieren): (${a} · 2) · (${b} : 2) = ${a * 2} · ${b / 2} = ${ans}.`;
+    } else if (bUnits >= 6) {
+      const bRound = bRest + 10;
+      const diff = bRound - b;
+      step2 = `Weg 2 (Aufrunden): ${a} · ${bRound} = ${a * bRound}, minus ${a} · ${diff} (${a * diff}) = ${ans}.`;
+    } else {
+      step2 = `Weg 2 (Nachbaraufgabe): ${a + 1} · ${b} = ${(a + 1) * b}, minus ${b} = ${ans}.`;
+    }
+
+    return buildTopicQuestion(
+      'de1_1',
+      `${a} · ${b} = ?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Zerlegen): ${a} · ${bRest} = ${a * bRest} und ${a} · ${bUnits} = ${a * bUnits}, Summe = ${ans}.`,
+        step2
+      ]
+    );
+  }
+
+  const divisor = difficulty === 1
+    ? randomInt(3, 9, randomFn)
+    : difficulty === 2
+      ? randomNonTenInt(4, 12, randomFn)
+      : randomNonTenInt(6, 18, randomFn);
+  const ans = difficulty === 1
+    ? randomNonTenInt(6, 19, randomFn)
+    : difficulty === 2
+      ? randomNonTenInt(12, 34, randomFn)
+      : randomNonTenInt(14, 48, randomFn);
+  const dividend = divisor * ans;
+
+  const firstChunk = ans > 10 ? Math.floor(ans / 10) * 10 * divisor : 5 * divisor;
+  const secondChunk = dividend - firstChunk;
+  const step1 = `Weg 1 (Zerlegen): ${firstChunk} : ${divisor} = ${firstChunk / divisor} und ${secondChunk} : ${divisor} = ${secondChunk / divisor}, Summe = ${ans}.`;
+
+  let step2;
+  if (divisor % 2 === 0) {
+    step2 = `Weg 2 (Halbieren): Beide Zahlen durch 2 teilen ergibt ${dividend / 2} : ${divisor / 2} = ${ans}.`;
+  } else {
+    const upper = Math.ceil(ans / 10) * 10 * divisor;
+    const diff = upper - dividend;
+    step2 = `Weg 2 (Von oben nähern): ${upper} : ${divisor} = ${upper / divisor}, minus ${diff} : ${divisor} (${diff / divisor}) = ${ans}.`;
+  }
+
+  return buildTopicQuestion(
+    'de1_1',
+    `${dividend} : ${divisor} = ?`,
+    ans,
+    difficulty,
+    [step1, step2]
+  );
+}
+
+/**
+ * DE 2.1 Brüche (Grundlagen): Bruchteile von Größen, Kürzen und Erweitern.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe2_1(difficulty, randomFn) {
+  const fractions = {
+    1: [
+      [1, 2], [1, 3], [2, 3], [1, 4], [3, 4],
+      [1, 5], [2, 5], [3, 5], [4, 5], [1, 10], [3, 10], [7, 10]
+    ],
+    2: [
+      [2, 3], [3, 4], [2, 5], [3, 5], [4, 5],
+      [1, 6], [5, 6], [3, 8], [5, 8], [7, 8],
+      [2, 9], [4, 9], [5, 12], [7, 12]
+    ],
+    3: [
+      [3, 7], [4, 7], [5, 7], [3, 8], [5, 8], [7, 8],
+      [4, 9], [5, 9], [7, 9], [5, 12], [7, 12], [11, 12],
+      [4, 15], [7, 15], [8, 15]
+    ]
+  };
+
+  const [num, den] = pickRandom(fractions[difficulty], randomFn);
+  const variant = pickRandom(['part', 'reduce', 'expand'], randomFn);
+
+  if (variant === 'part') {
+    const k = difficulty === 1
+      ? randomInt(2, 9, randomFn)
+      : difficulty === 2
+        ? randomInt(3, 14, randomFn)
+        : randomInt(4, 18, randomFn);
+    const total = den * k;
+    const ans = num * k;
+
+    const step1 = `Weg 1 (Erst teilen, dann malnehmen): ${total} : ${den} = ${k}, dann ${k} · ${num} = ${ans}.`;
+    let step2;
+    if (num === den - 1 && den >= 3) {
+      step2 = `Weg 2 (Rest vom Ganzen): 1/${den} von ${total} ist ${k}, also ${total} - ${k} = ${ans}.`;
+    } else if (num === 1) {
+      step2 = `Weg 2 (Direkte Teilung): Der Bruch 1/${den} teilt ${total} in ${den} gleiche Teile, je ${ans}.`;
+    } else {
+      step2 = `Weg 2 (Erst malnehmen): ${total} · ${num} = ${total * num}, danach : ${den} = ${ans}.`;
+    }
+
+    return buildTopicQuestion(
+      'de2_1',
+      `${num}/${den} von ${total} = ?`,
+      ans,
+      difficulty,
+      [step1, step2]
+    );
+  }
+
+  if (variant === 'reduce') {
+    const k = difficulty === 1
+      ? randomInt(2, 5, randomFn)
+      : difficulty === 2
+        ? randomInt(3, 8, randomFn)
+        : randomInt(4, 11, randomFn);
+    const bigNum = num * k;
+    const bigDen = den * k;
+
+    return buildTopicQuestion(
+      'de2_1',
+      `${bigNum}/${bigDen} = ?/${den}`,
+      num,
+      difficulty,
+      [
+        `Weg 1 (Kürzungszahl finden): ${bigDen} : ${den} = ${k}, also Zähler ${bigNum} : ${k} = ${num}.`,
+        `Weg 2 (Verhältnis prüfen): ${den} passt ${k}-mal in ${bigDen}, und ${num} · ${k} ergibt ${bigNum}.`
+      ]
+    );
+  }
+
+  const k = difficulty === 1
+    ? randomInt(2, 5, randomFn)
+    : difficulty === 2
+      ? randomInt(3, 8, randomFn)
+      : randomInt(4, 11, randomFn);
+  const bigDen = den * k;
+  const ans = num * k;
+
+  return buildTopicQuestion(
+    'de2_1',
+    `${num}/${den} = ?/${bigDen}`,
+    ans,
+    difficulty,
+    [
+      `Weg 1 (Erweiterungszahl): ${bigDen} : ${den} = ${k}, deshalb Zähler ${num} · ${k} = ${ans}.`,
+      `Weg 2 (Als Bruchteil): ${num}/${den} von ${bigDen} ist (${bigDen} : ${den}) · ${num} = ${k} · ${num} = ${ans}.`
+    ]
+  );
+}
+
+/**
+ * DE 2.2 Brüche (Fortgeschritten): Addition/Subtraktion, Division durch Bruch, Bruchmultiplikation.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe2_2(difficulty, randomFn) {
+  const variant = pickRandom(['addsub', 'divfrac', 'mulfrac'], randomFn);
+
+  if (variant === 'addsub') {
+    const denPairs = {
+      1: [
+        [2, 4, 4], [2, 6, 6], [3, 6, 6], [2, 8, 8], [4, 8, 8], [5, 10, 10]
+      ],
+      2: [
+        [2, 3, 6], [3, 4, 12], [2, 5, 10], [4, 6, 12], [3, 5, 15], [4, 10, 20]
+      ],
+      3: [
+        [4, 5, 20], [3, 8, 24], [5, 6, 30], [6, 8, 24], [4, 9, 36], [6, 9, 18]
+      ]
+    };
+
+    const [d1Raw, d2Raw, commonDen] = pickRandom(denPairs[difficulty], randomFn);
+    let d1 = d1Raw;
+    let d2 = d2Raw;
+    let a = randomInt(1, d1 - 1, randomFn);
+    let b = randomInt(1, d2 - 1, randomFn);
+    const isSub = safeRandom(randomFn) < 0.4;
+
+    if (isSub && a * (commonDen / d1) < b * (commonDen / d2)) {
+      const tmpA = a;
+      const tmpD1 = d1;
+      a = b;
+      d1 = d2;
+      b = tmpA;
+      d2 = tmpD1;
+    }
+
+    const f1 = commonDen / d1;
+    const f2 = commonDen / d2;
+    const n1 = a * f1;
+    const n2 = b * f2;
+    const ans = isSub ? n1 - n2 : n1 + n2;
+    const opSign = isSub ? '-' : '+';
+
+    return buildTopicQuestion(
+      'de2_2',
+      `${a}/${d1} ${opSign} ${b}/${d2} = ?/${commonDen}`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Gleichnamig machen): ${a}/${d1} = ${n1}/${commonDen} und ${b}/${d2} = ${n2}/${commonDen}, also ${n1} ${opSign} ${n2} = ${ans}.`,
+        `Weg 2 (Teile von ${commonDen}): ${a}/${d1} von ${commonDen} sind ${n1}, ${b}/${d2} sind ${n2}, Ergebnis ${n1} ${opSign} ${n2} = ${ans}.`
+      ]
+    );
+  }
+
+  if (variant === 'divfrac') {
+    const fracPool = {
+      1: [[1, 2], [1, 3], [2, 3], [1, 4], [3, 4], [2, 5]],
+      2: [[2, 3], [3, 4], [2, 5], [3, 5], [4, 5], [5, 6], [3, 8]],
+      3: [[2, 5], [3, 7], [4, 7], [3, 8], [5, 8], [5, 9], [7, 12]]
+    };
+    const [num, den] = pickRandom(fracPool[difficulty], randomFn);
+    const maxK = difficulty === 1 ? 5 : difficulty === 2 ? 6 : 8;
+    const k = randomInt(difficulty === 1 ? 1 : 2, maxK, randomFn);
+    const whole = num * k;
+    const ans = k * den;
+
+    return buildTopicQuestion(
+      'de2_2',
+      `${whole} : (${num}/${den}) = ?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Kehrwert malnehmen): ${whole} · (${den}/${num}) = (${whole} : ${num}) · ${den} = ${k} · ${den} = ${ans}.`,
+        `Weg 2 (Gleichnamig vergleichen): ${whole} = ${whole * den}/${den}, und ${num}/${den} passt (${whole * den} : ${num}) = ${ans}-mal hinein.`
+      ]
+    );
+  }
+
+  const coprimeBases = [
+    [2, 3], [2, 5], [3, 4], [3, 5], [4, 5], [3, 7], [4, 7], [5, 6], [5, 7]
+  ];
+  const [b, d] = pickRandom(coprimeBases, randomFn);
+  const k1Pool = [];
+  const k2Pool = [];
+  const maxFactor = difficulty === 1 ? 3 : difficulty === 2 ? 5 : 7;
+  for (let i = 1; i <= maxFactor; i += 1) {
+    if (gcd(i, d) === 1) k1Pool.push(i);
+    if (gcd(i, b) === 1) k2Pool.push(i);
+  }
+  const k1 = pickRandom(k1Pool, randomFn);
+  const k2 = pickRandom(k2Pool, randomFn);
+  const a = d * k2;
+  const c = b * k1;
+  const ans = k1 * k2;
+
+  return buildTopicQuestion(
+    'de2_2',
+    `(${a}/${b}) · (${c}/${d}) = ?`,
+    ans,
+    difficulty,
+    [
+      `Weg 1 (Über Kreuz kürzen): ${a} gegen ${d} ergibt ${k2}, ${c} gegen ${b} ergibt ${k1}, also ${k2} · ${k1} = ${ans}.`,
+      `Weg 2 (Direkt ausmultiplizieren): (${a} · ${c}) : (${b} · ${d}) = ${a * c} : ${b * d} = ${ans}.`
+    ]
+  );
+}
+
+/**
+ * DE 3.1 Terme - Potenzgesetze.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe3_1(difficulty, randomFn) {
+  const variants = difficulty === 1
+    ? ['mulExp', 'powPow', 'divExp', 'divVal']
+    : ['mulExp', 'powPow', 'divExp', 'divVal', 'sameExp'];
+  const variant = pickRandom(variants, randomFn);
+
+  if (variant === 'mulExp') {
+    const base = randomInt(2, difficulty === 1 ? 5 : 9, randomFn);
+    const maxExp = difficulty === 1 ? 5 : difficulty === 2 ? 8 : 11;
+    const e1 = randomInt(2, maxExp, randomFn);
+    const e2 = randomInt(2, maxExp, randomFn);
+    const ans = e1 + e2;
+
+    return buildTopicQuestion(
+      'de3_1',
+      `${base}${toSuperscript(e1)} · ${base}${toSuperscript(e2)} = ${base}^?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Potenzgesetz): Bei gleicher Basis ${base} werden die Exponenten addiert: ${e1} + ${e2} = ${ans}.`,
+        `Weg 2 (Faktoren zählen): ${e1} Faktoren ${base} mal ${e2} Faktoren ${base} sind zusammen ${ans} Faktoren.`
+      ]
+    );
+  }
+
+  if (variant === 'powPow') {
+    const base = randomInt(2, difficulty === 1 ? 5 : 9, randomFn);
+    const e1 = randomInt(2, difficulty === 1 ? 4 : 6, randomFn);
+    const e2 = randomInt(2, difficulty === 1 ? 3 : 5, randomFn);
+    const ans = e1 * e2;
+
+    return buildTopicQuestion(
+      'de3_1',
+      `(${base}${toSuperscript(e1)})${toSuperscript(e2)} = ${base}^?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Potenzgesetz): Potenzen werden potenziert, indem man Exponenten malnimmt: ${e1} · ${e2} = ${ans}.`,
+        `Weg 2 (Ausgeschrieben): ${base}${toSuperscript(e1)} steht ${e2}-mal als Faktor, daher ${e2} · ${e1} = ${ans} Faktoren ${base}.`
+      ]
+    );
+  }
+
+  if (variant === 'divExp') {
+    const base = randomInt(2, difficulty === 1 ? 6 : 9, randomFn);
+    const e2 = randomInt(2, difficulty === 1 ? 4 : 7, randomFn);
+    const diffExp = randomInt(1, difficulty === 1 ? 4 : 6, randomFn);
+    const e1 = e2 + diffExp;
+
+    return buildTopicQuestion(
+      'de3_1',
+      `${base}${toSuperscript(e1)} : ${base}${toSuperscript(e2)} = ${base}^?`,
+      diffExp,
+      difficulty,
+      [
+        `Weg 1 (Potenzgesetz): Bei Division gleicher Basis ${base} Exponenten abziehen: ${e1} - ${e2} = ${diffExp}.`,
+        `Weg 2 (Bruch kürzen): Im Bruch ${base}${toSuperscript(e1)} / ${base}${toSuperscript(e2)} kürzen sich ${e2} Faktoren weg, es bleiben ${diffExp}.`
+      ]
+    );
+  }
+
+  if (variant === 'divVal') {
+    const valuePairs = {
+      1: [[2, 2], [2, 3], [3, 2], [4, 2], [5, 2], [10, 2]],
+      2: [[2, 3], [2, 4], [3, 3], [4, 2], [5, 2], [6, 2], [7, 2]],
+      3: [[2, 4], [2, 5], [3, 3], [4, 3], [5, 3], [8, 2], [9, 2]]
+    };
+    const [base, diffExp] = pickRandom(valuePairs[difficulty], randomFn);
+    const e2 = randomInt(2, difficulty === 1 ? 4 : 6, randomFn);
+    const e1 = e2 + diffExp;
+    const ans = base ** diffExp;
+
+    return buildTopicQuestion(
+      'de3_1',
+      `${base}${toSuperscript(e1)} : ${base}${toSuperscript(e2)} = ?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Exponenten subtrahieren): ${e1} - ${e2} = ${diffExp}, damit ${base}${toSuperscript(diffExp)} = ${ans}.`,
+        `Weg 2 (Kürzen): Nach Kürzen von ${e2} Faktoren ${base} bleiben ${diffExp} Faktoren übrig, Produkt = ${ans}.`
+      ]
+    );
+  }
+
+  const a = randomInt(2, difficulty === 2 ? 5 : 7, randomFn);
+  const b = randomInt(2, difficulty === 2 ? 5 : 7, randomFn);
+  const exp = randomInt(2, difficulty === 2 ? 5 : 8, randomFn);
+  const ans = a * b;
+
+  return buildTopicQuestion(
+    'de3_1',
+    `${a}${toSuperscript(exp)} · ${b}${toSuperscript(exp)} = ?${toSuperscript(exp)}`,
+    ans,
+    difficulty,
+    [
+      `Weg 1 (Gleicher Exponent): Basen multiplizieren und Exponent ${exp} behalten: ${a} · ${b} = ${ans}.`,
+      `Weg 2 (Paare bilden): Man gruppiert zu (${a} · ${b})${toSuperscript(exp)} = ${ans}${toSuperscript(exp)}.`
+    ]
+  );
+}
+
+/**
+ * DE 3.2 Terme - Exponenten und Logarithmen.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe3_2(difficulty, randomFn) {
+  const pools = {
+    1: [
+      [2, 1], [2, 2], [2, 3], [2, 4], [2, 5],
+      [3, 1], [3, 2], [3, 3], [5, 2], [10, 1], [10, 2], [10, 3]
+    ],
+    2: [
+      [2, 4], [2, 5], [2, 6], [2, 7],
+      [3, 2], [3, 3], [3, 4], [4, 2], [4, 3],
+      [5, 2], [5, 3], [10, 3], [10, 4], [2, 0]
+    ],
+    3: [
+      [2, 6], [2, 7], [2, 8], [2, 9], [2, 10],
+      [3, 4], [3, 5], [4, 4], [5, 4],
+      [6, 2], [7, 2], [8, 2], [9, 2], [10, 0]
+    ]
+  };
+
+  const variants = difficulty === 1 ? ['log', 'expEq'] : ['log', 'expEq', 'logLaw'];
+  const variant = pickRandom(variants, randomFn);
+
+  if (variant === 'log') {
+    const [base, x] = pickRandom(pools[difficulty], randomFn);
+    const val = base ** x;
+
+    let step2;
+    if (x === 0) {
+      step2 = `Weg 2 (Sonderfall 1): Jede positive Basis hoch 0 ergibt 1, also log${toSubscript(base)}(1) = 0.`;
+    } else if (base === 10) {
+      step2 = `Weg 2 (Nullen zählen): ${val} ist eine 1 mit ${x} ${x === 1 ? 'Null' : 'Nullen'}, also ist der Zehnerlogarithmus ${x}.`;
+    } else if (x <= 5) {
+      const chain = Array.from({ length: x }, () => base).join(' · ');
+      step2 = `Weg 2 (Hochmultiplizieren): ${chain} = ${val}, das sind genau ${x} Faktoren ${base}.`;
+    } else {
+      const half = Math.floor(x / 2);
+      const rest = x - half;
+      step2 = `Weg 2 (Teilen über Potenzen): ${base}${toSuperscript(half)} = ${base ** half} und ${base}${toSuperscript(rest)} = ${base ** rest}, Exponenten ${half} + ${rest} = ${x}.`;
+    }
+
+    return buildTopicQuestion(
+      'de3_2',
+      `log${toSubscript(base)}(${val}) = ?`,
+      x,
+      difficulty,
+      [
+        `Weg 1 (Umkehrfrage): ${base} hoch welche Zahl ergibt ${val}? ${base}${toSuperscript(x)} = ${val}, also ${x}.`,
+        step2
+      ]
+    );
+  }
+
+  if (variant === 'expEq') {
+    const nonZeroPool = pools[difficulty].filter(([, x]) => x >= 1);
+    const [base, x] = pickRandom(nonZeroPool, randomFn);
+    const val = base ** x;
+
+    const step1 = x <= 5
+      ? `Weg 1 (Potenzen prüfen): ${Array.from({ length: x }, (_, idx) => `${base}${toSuperscript(idx + 1)}=${base ** (idx + 1)}`).join(', ')}, also x = ${x}.`
+      : `Weg 1 (Ankern): ${base}${toSuperscript(Math.floor(x / 2))} = ${base ** Math.floor(x / 2)}, bis ${val} fehlen noch ${x - Math.floor(x / 2)} Schritte -> x = ${x}.`;
+
+    return buildTopicQuestion(
+      'de3_2',
+      `${base}^x = ${val} | x = ?`,
+      x,
+      difficulty,
+      [
+        step1,
+        `Weg 2 (Logarithmus): x = log${toSubscript(base)}(${val}) = ${x}, weil ${base}${toSuperscript(x)} = ${val}.`
+      ]
+    );
+  }
+
+  const lawBase = pickRandom([2, 3, 5, 6, 10], randomFn);
+  const ans = randomInt(2, lawBase <= 3 ? 4 : 3, randomFn);
+  const target = lawBase ** ans;
+  const mul = randomInt(2, 5, randomFn);
+  const bigArg = target * mul;
+
+  return buildTopicQuestion(
+    'de3_2',
+    `log${toSubscript(lawBase)}(${bigArg}) - log${toSubscript(lawBase)}(${mul}) = ?`,
+    ans,
+    difficulty,
+    [
+      `Weg 1 (Logarithmengesetz): Differenz wird zum Quotienten: log${toSubscript(lawBase)}(${bigArg} : ${mul}) = log${toSubscript(lawBase)}(${target}).`,
+      `Weg 2 (Exponent ablesen): ${lawBase}${toSuperscript(ans)} = ${target}, daher ist das Ergebnis ${ans}.`
+    ]
+  );
+}
+
+/**
+ * DE 4.1 Gleichungen: Lineare Gleichungen, Klammern und beidseitige Terme.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe4_1(difficulty, randomFn) {
+  const variants = difficulty === 1 ? ['axb', 'paren'] : ['axb', 'paren', 'bothSides'];
+  const variant = pickRandom(variants, randomFn);
+
+  if (variant === 'axb') {
+    const a = randomInt(2, difficulty === 1 ? 5 : difficulty === 2 ? 8 : 11, randomFn);
+    const x = randomInt(1, difficulty === 1 ? 9 : 14, randomFn);
+    const isMinus = safeRandom(randomFn) < 0.5;
+    const maxB = isMinus ? Math.min(25, a * x) : difficulty === 1 ? 15 : 28;
+    const b = randomInt(1, Math.max(1, maxB), randomFn);
+    const c = isMinus ? a * x - b : a * x + b;
+    const sign = isMinus ? '-' : '+';
+    const invOp = isMinus ? '+' : '-';
+
+    return buildTopicQuestion(
+      'de4_1',
+      `${a}x ${sign} ${b} = ${c} | x = ?`,
+      x,
+      difficulty,
+      [
+        `Weg 1 (Rückwärts auflösen): Erst ${c} ${invOp} ${b} = ${a * x}, dann ${a * x} : ${a} = ${x}.`,
+        `Weg 2 (Gegenprobe): ${a} · ${x} ${sign} ${b} = ${a * x} ${sign} ${b} = ${c}.`
+      ]
+    );
+  }
+
+  if (variant === 'paren') {
+    const a = randomInt(2, difficulty === 1 ? 4 : 7, randomFn);
+    const isMinus = safeRandom(randomFn) < 0.45;
+    const b = randomInt(1, difficulty === 1 ? 6 : 9, randomFn);
+    const x = isMinus ? b + randomInt(1, 9, randomFn) : randomInt(1, 12, randomFn);
+    const inner = isMinus ? x - b : x + b;
+    const c = a * inner;
+    const sign = isMinus ? '-' : '+';
+    const invOp = isMinus ? '+' : '-';
+    const ab = a * b;
+    const axVal = isMinus ? c + ab : c - ab;
+
+    return buildTopicQuestion(
+      'de4_1',
+      `${a}(x ${sign} ${b}) = ${c} | x = ?`,
+      x,
+      difficulty,
+      [
+        `Weg 1 (Erst durch ${a} teilen): ${c} : ${a} = ${inner}, also x ${sign} ${b} = ${inner} -> x = ${inner} ${invOp} ${b} = ${x}.`,
+        `Weg 2 (Ausmultiplizieren): ${a}x ${sign} ${ab} = ${c} -> ${a}x = ${axVal} -> x = ${axVal} : ${a} = ${x}.`
+      ]
+    );
+  }
+
+  const x = randomInt(1, difficulty === 2 ? 10 : 14, randomFn);
+  const d = randomInt(1, 5, randomFn);
+  const diffA = randomInt(2, 6, randomFn);
+  const a = d + diffA;
+  const b = randomInt(1, 18, randomFn);
+  const c = b + diffA * x;
+  const dTerm = d === 1 ? 'x' : `${d}x`;
+
+  return buildTopicQuestion(
+    'de4_1',
+    `${a}x + ${b} = ${dTerm} + ${c} | x = ?`,
+    x,
+    difficulty,
+    [
+      `Weg 1 (Sortieren): ${a}x - ${dTerm} = ${c} - ${b}, also ${diffA}x = ${c - b} -> x = ${x}.`,
+      `Weg 2 (Waage-Probe mit x = ${x}): Links ${a} · ${x} + ${b} = ${a * x + b}, rechts ${d} · ${x} + ${c} = ${d * x + c}.`
+    ]
+  );
+}
+
+/**
+ * DE 4.2 Lineare Gleichungssysteme.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe4_2(difficulty, randomFn) {
+  const variants = difficulty === 1 ? ['sumDiff', 'subst'] : ['sumDiff', 'subst', 'elim'];
+  const variant = pickRandom(variants, randomFn);
+
+  if (variant === 'sumDiff') {
+    const y = randomInt(1, difficulty === 1 ? 7 : 12, randomFn);
+    const x = y + randomInt(1, difficulty === 1 ? 8 : 12, randomFn);
+    const sum = x + y;
+    const diff = x - y;
+    const askY = difficulty >= 2 && safeRandom(randomFn) < 0.45;
+
+    if (askY) {
+      return buildTopicQuestion(
+        'de4_2',
+        `x + y = ${sum}, x - y = ${diff} | y = ?`,
+        y,
+        difficulty,
+        [
+          `Weg 1 (Subtrahieren): (${sum}) - (${diff}) eliminiert x und ergibt 2y = ${sum - diff}, also y = ${y}.`,
+          `Weg 2 (Erst x bestimmen): x = (${sum} + ${diff}) : 2 = ${x}, dann y = ${sum} - ${x} = ${y}.`
+        ]
+      );
+    }
+
+    return buildTopicQuestion(
+      'de4_2',
+      `x + y = ${sum}, x - y = ${diff} | x = ?`,
+      x,
+      difficulty,
+      [
+        `Weg 1 (Additionsverfahren): (x + y) + (x - y) = ${sum} + ${diff}, also 2x = ${sum + diff} -> x = ${x}.`,
+        `Weg 2 (Einsetzen): y = ${sum} - x einsetzen ergibt x - (${sum} - x) = ${diff}, also 2x = ${sum + diff} -> x = ${x}.`
+      ]
+    );
+  }
+
+  if (variant === 'subst') {
+    const k = randomInt(2, difficulty === 1 ? 3 : 5, randomFn);
+    const a = randomInt(1, difficulty === 1 ? 2 : 4, randomFn);
+    const x = randomInt(1, difficulty === 1 ? 8 : 12, randomFn);
+    const y = k * x;
+    const total = (a + k) * x;
+    const aTerm = a === 1 ? 'x' : `${a}x`;
+    const askY = difficulty >= 2 && safeRandom(randomFn) < 0.4;
+    const ans = askY ? y : x;
+    const targetVar = askY ? 'y' : 'x';
+
+    const aShares = a === 1 ? '1 Anteil' : `${a} Anteile`;
+    return buildTopicQuestion(
+      'de4_2',
+      `y = ${k}x, ${aTerm} + y = ${total} | ${targetVar} = ?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Einsetzen): ${aTerm} + ${k}x = ${total}, also ${a + k}x = ${total} -> x = ${x}${askY ? `, y = ${k} · ${x} = ${y}` : ''}.`,
+        `Weg 2 (Anteile zählen): ${aShares} für x plus ${k} Anteile für y sind ${a + k} Anteile = ${total}, ein Anteil = ${x}${askY ? `, y = ${y}` : ''}.`
+      ]
+    );
+  }
+
+  const x = randomInt(1, 12, randomFn);
+  const y = randomInt(1, 9, randomFn);
+  const b = randomInt(1, 3, randomFn);
+  const a = b + randomInt(1, 4, randomFn);
+  const c1 = x + a * y;
+  const c2 = x + b * y;
+  const bTerm = b === 1 ? 'y' : `${b}y`;
+  const askX = safeRandom(randomFn) < 0.45;
+  const ans = askX ? x : y;
+  const targetVar = askX ? 'x' : 'y';
+
+  return buildTopicQuestion(
+    'de4_2',
+    `x + ${a}y = ${c1}, x + ${bTerm} = ${c2} | ${targetVar} = ?`,
+    ans,
+    difficulty,
+    [
+      `Weg 1 (Subtraktionsverfahren): Gleichungen abziehen ergibt ${a - b}y = ${c1 - c2}, also y = ${y}${askX ? ` und x = ${c2} - ${b * y} = ${x}` : ''}.`,
+      `Weg 2 (Einsetzen): x = ${c2} - ${bTerm} in Gleichung 1 liefert ${c2} + ${a - b}y = ${c1} -> y = ${y}${askX ? `, x = ${x}` : ''}.`
+    ]
+  );
+}
+
+/**
+ * DE 5.1 Funktionen (Geraden): Funktionswerte, Nullstellen, Steigung.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe5_1(difficulty, randomFn) {
+  const variants = difficulty === 1 ? ['eval', 'zero'] : ['eval', 'zero', 'slope'];
+  const variant = pickRandom(variants, randomFn);
+
+  if (variant === 'eval') {
+    const m = randomInt(2, difficulty === 1 ? 5 : 9, randomFn);
+    const x0 = randomInt(1, difficulty === 1 ? 7 : 12, randomFn);
+    const isMinus = safeRandom(randomFn) < 0.45;
+    const maxC = isMinus ? Math.min(20, m * x0) : difficulty === 1 ? 12 : 25;
+    const c = randomInt(1, Math.max(1, maxC), randomFn);
+    const sign = isMinus ? '-' : '+';
+    const ans = isMinus ? m * x0 - c : m * x0 + c;
+    const yAxis = isMinus ? `-${c}` : `${c}`;
+
+    const stepLabel = x0 === 1 ? '1 Schritt' : `${x0} Schritte`;
+    return buildTopicQuestion(
+      'de5_1',
+      `f(x) = ${m}x ${sign} ${c} | f(${x0}) = ?`,
+      ans,
+      difficulty,
+      [
+        `Weg 1 (Direkt einsetzen): f(${x0}) = ${m} · ${x0} ${sign} ${c} = ${m * x0} ${sign} ${c} = ${ans}.`,
+        `Weg 2 (Startwert und Steigung): Start bei f(0) = ${yAxis}, plus ${stepLabel} mal Steigung ${m} (+${m * x0}) = ${ans}.`
+      ]
+    );
+  }
+
+  if (variant === 'zero') {
+    const m = randomInt(2, difficulty === 1 ? 6 : 12, randomFn);
+    const x0 = randomInt(1, difficulty === 1 ? 9 : 15, randomFn);
+    const b = m * x0;
+
+    return buildTopicQuestion(
+      'de5_1',
+      `Nullstelle: f(x) = ${m}x - ${b} | x = ?`,
+      x0,
+      difficulty,
+      [
+        `Weg 1 (Null setzen): ${m}x - ${b} = 0 -> ${m}x = ${b} -> x = ${b} : ${m} = ${x0}.`,
+        `Weg 2 (Steigungsschritte): Von f(0) = -${b} wächst y pro Schritt um ${m}; bis 0 braucht es ${b} : ${m} = ${x0} Schritte.`
+      ]
+    );
+  }
+
+  const m = randomInt(2, difficulty === 2 ? 8 : 12, randomFn);
+  const c = randomInt(1, 15, randomFn);
+  const x0 = randomInt(2, 8, randomFn);
+  const y0 = m * x0 + c;
+
+  return buildTopicQuestion(
+    'de5_1',
+    `f(x) = mx + ${c} mit f(${x0}) = ${y0} | m = ?`,
+    m,
+    difficulty,
+    [
+      `Weg 1 (Gleichung umstellen): m · ${x0} + ${c} = ${y0} -> m · ${x0} = ${y0 - c} -> m = ${m}.`,
+      `Weg 2 (Steigungsdreieck): Von f(0) = ${c} bis f(${x0}) = ${y0} steigt y um ${y0 - c} auf ${x0} Einheiten: ${y0 - c} : ${x0} = ${m}.`
+    ]
+  );
+}
+
+/**
+ * DE 5.2 Funktionen (Fortgeschritten): Scheitelpunktform, Minimum, Nullstellen von Parabeln.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe5_2(difficulty, randomFn) {
+  const variants = difficulty === 1
+    ? ['vertexX', 'minY', 'posZero']
+    : ['vertexX', 'minY', 'posZero', 'evalQuad'];
+  const variant = pickRandom(variants, randomFn);
+
+  if (variant === 'vertexX') {
+    const xs = randomInt(1, difficulty === 1 ? 9 : 15, randomFn);
+    const ys = randomInt(1, 20, randomFn);
+    const a = difficulty >= 2 ? randomInt(1, 4, randomFn) : 1;
+    const prefix = a === 1 ? '' : `${a}`;
+
+    return buildTopicQuestion(
+      'de5_2',
+      `Scheitel-x: f(x) = ${prefix}(x - ${xs})² + ${ys} | x = ?`,
+      xs,
+      difficulty,
+      [
+        `Weg 1 (Scheitelpunktform): Bei (x - d)² + e liegt der Scheitel bei x = d, also ist x = ${xs}.`,
+        `Weg 2 (Klammer null setzen): Das Quadrat wird am kleinsten für x - ${xs} = 0, daher x = ${xs}.`
+      ]
+    );
+  }
+
+  if (variant === 'minY') {
+    const xs = randomInt(1, 12, randomFn);
+    const ys = randomInt(1, difficulty === 1 ? 12 : 25, randomFn);
+    const a = difficulty >= 2 ? randomInt(1, 4, randomFn) : 1;
+    const prefix = a === 1 ? '' : `${a}`;
+
+    return buildTopicQuestion(
+      'de5_2',
+      `Minimum-y: f(x) = ${prefix}(x - ${xs})² + ${ys} | y = ?`,
+      ys,
+      difficulty,
+      [
+        `Weg 1 (Scheitelpunktform): Der hintere Summand e gibt direkt den kleinsten y-Wert an, hier y = ${ys}.`,
+        `Weg 2 (Abschätzung): Ein Quadrat ist mindestens 0 (bei x = ${xs}), daher f(${xs}) = 0 + ${ys} = ${ys}.`
+      ]
+    );
+  }
+
+  if (variant === 'posZero') {
+    const r = randomInt(2, difficulty === 1 ? 9 : 15, randomFn);
+    const a = difficulty === 3 ? randomInt(2, 4, randomFn) : 1;
+    const c = a * r * r;
+    const aPrefix = a === 1 ? '' : `${a}`;
+
+    const step1 = a === 1
+      ? `Weg 1 (Wurzel ziehen): x² - ${c} = 0 -> x² = ${c} -> positive Wurzel x = ${r}.`
+      : `Weg 1 (Erst durch ${a} teilen): ${a}x² = ${c} -> x² = ${r * r} -> positive Wurzel x = ${r}.`;
+    const step2 = a === 1
+      ? `Weg 2 (3. Binomische Formel): x² - ${c} = (x - ${r})(x + ${r}) = 0 -> positive Nullstelle x = ${r}.`
+      : `Weg 2 (Ausklammern): ${a}(x - ${r})(x + ${r}) = 0 -> positive Nullstelle x = ${r}.`;
+
+    return buildTopicQuestion(
+      'de5_2',
+      `Pos. Nullstelle: f(x) = ${aPrefix}x² - ${c} | x = ?`,
+      r,
+      difficulty,
+      [step1, step2]
+    );
+  }
+
+  const xs = randomInt(1, 10, randomFn);
+  const delta = randomInt(2, difficulty === 2 ? 5 : 7, randomFn);
+  const x0 = xs + delta;
+  const ys = randomInt(1, 15, randomFn);
+  const sq = delta * delta;
+  const ans = sq + ys;
+
+  return buildTopicQuestion(
+    'de5_2',
+    `f(x) = (x - ${xs})² + ${ys} | f(${x0}) = ?`,
+    ans,
+    difficulty,
+    [
+      `Weg 1 (Klammer zuerst): (${x0} - ${xs})² + ${ys} = ${delta}² + ${ys} = ${sq} + ${ys} = ${ans}.`,
+      `Weg 2 (Abstand zum Scheitel): Abstand zu x = ${xs} ist ${delta}, Quadrat ${sq} zum Minimum ${ys} addieren ergibt ${ans}.`
+    ]
+  );
+}
+
+/**
+ * DE 6.1 Technik - Trigonometrie am Dreieck.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe6_1(difficulty, randomFn) {
+  const variant = pickRandom(['pyth', 'sin30', 'cos60', 'tan45'], randomFn);
+
+  if (variant === 'pyth') {
+    const triples = {
+      1: [[3, 4, 5, 1, 4]],
+      2: [[3, 4, 5, 3, 8], [5, 12, 13, 1, 3]],
+      3: [[3, 4, 5, 5, 12], [5, 12, 13, 2, 5], [8, 15, 17, 1, 3]]
+    };
+    const [ta, tb, tc, minK, maxK] = pickRandom(triples[difficulty], randomFn);
+    const k = randomInt(minK, maxK, randomFn);
+    const a = ta * k;
+    const b = tb * k;
+    const c = tc * k;
+
+    const findSideB = difficulty >= 2 && safeRandom(randomFn) < 0.45;
+    if (findSideB) {
+      return buildTopicQuestion(
+        'de6_1',
+        `Dreieck (90°): a = ${a}, Hypotenuse c = ${c} | b = ?`,
+        b,
+        difficulty,
+        [
+          `Weg 1 (Tripel ${ta}-${tb}-${tc}): a und c sind das ${k}-fache von ${ta} und ${tc}, also b = ${k} · ${tb} = ${b}.`,
+          `Weg 2 (3. Binom bei c² - a²): (${c} - ${a}) · (${c} + ${a}) = ${c - a} · ${c + a} = ${b * b}, Wurzel ist ${b}.`
+        ]
+      );
+    }
+
+    return buildTopicQuestion(
+      'de6_1',
+      `Dreieck (90°): a = ${a}, b = ${b} | c = ?`,
+      c,
+      difficulty,
+      [
+        `Weg 1 (Tripel ${ta}-${tb}-${tc}): Katheten sind das ${k}-fache von ${ta} und ${tb}, also c = ${k} · ${tc} = ${c}.`,
+        `Weg 2 (Pythagoras): ${a}² + ${b}² = ${a * a} + ${b * b} = ${c * c}, Wurzel daraus ist ${c}.`
+      ]
+    );
+  }
+
+  if (variant === 'sin30') {
+    const a = randomInt(3, difficulty === 1 ? 15 : 35, randomFn);
+    const c = 2 * a;
+    const findHyp = difficulty >= 2 && safeRandom(randomFn) < 0.45;
+
+    if (findHyp) {
+      return buildTopicQuestion(
+        'de6_1',
+        `sin(30°) = 0,5, Gegenkathete a = ${a} | c = ?`,
+        c,
+        difficulty,
+        [
+          `Weg 1 (Formel umstellen): c = a : sin(30°) = ${a} : 0,5 = ${a} · 2 = ${c}.`,
+          `Weg 2 (Geometrie): Bei 30° ist die Hypotenuse doppelt so lang wie die Gegenkathete: 2 · ${a} = ${c}.`
+        ]
+      );
+    }
+
+    return buildTopicQuestion(
+      'de6_1',
+      `sin(30°) = 0,5, c = ${c} | a = ?`,
+      a,
+      difficulty,
+      [
+        `Weg 1 (Sinus-Formel): a = c · sin(30°) = ${c} · 0,5 = ${a}.`,
+        `Weg 2 (Halbes gleichseitiges Dreieck): Bei 30° ist die Gegenkathete halb so lang wie c: ${c} : 2 = ${a}.`
+      ]
+    );
+  }
+
+  if (variant === 'cos60') {
+    const b = randomInt(3, difficulty === 1 ? 15 : 35, randomFn);
+    const c = 2 * b;
+    const findHyp = difficulty >= 2 && safeRandom(randomFn) < 0.45;
+
+    if (findHyp) {
+      return buildTopicQuestion(
+        'de6_1',
+        `cos(60°) = 0,5, Ankathete b = ${b} | c = ?`,
+        c,
+        difficulty,
+        [
+          `Weg 1 (Formel umstellen): c = b : cos(60°) = ${b} : 0,5 = ${b} · 2 = ${c}.`,
+          `Weg 2 (Verdoppeln): Da cos(60°) = 1/2 gilt, ist c genau das Doppelte von ${b}: ${c}.`
+        ]
+      );
+    }
+
+    return buildTopicQuestion(
+      'de6_1',
+      `cos(60°) = 0,5, c = ${c} | b = ?`,
+      b,
+      difficulty,
+      [
+        `Weg 1 (Cosinus-Formel): b = c · cos(60°) = ${c} · 0,5 = ${b}.`,
+        `Weg 2 (Komplementwinkel): cos(60°) = sin(30°) = 0,5, daher Hälfte von ${c} = ${b}.`
+      ]
+    );
+  }
+
+  const side = randomInt(4, difficulty === 1 ? 18 : 45, randomFn);
+  return buildTopicQuestion(
+    'de6_1',
+    `Dreieck (90°, alpha = 45°): Ankathete b = ${side} | a = ?`,
+    side,
+    difficulty,
+    [
+      `Weg 1 (Tangens): a = b · tan(45°) = ${side} · 1 = ${side}.`,
+      `Weg 2 (Gleichschenklig): Bei 45° sind beide Winkel an der Hypotenuse gleich, also gilt a = b = ${side}.`
+    ]
+  );
+}
+
+/**
+ * DE 6.2 Technik - Trigonometrische Funktionen.
+ * @param {number} difficulty
+ * @param {() => number} randomFn
+ */
+function generateDe6_2(difficulty, randomFn) {
+  const variants = difficulty === 1
+    ? ['amplitude', 'periodB', 'exactVal']
+    : ['amplitude', 'periodB', 'exactVal', 'maxVal'];
+  const variant = pickRandom(variants, randomFn);
+
+  if (variant === 'amplitude') {
+    const amp = randomInt(2, difficulty === 1 ? 9 : 25, randomFn);
+    const b = randomInt(2, 9, randomFn);
+    const fn = pickRandom(['sin', 'cos'], randomFn);
+    const shift = difficulty >= 2 ? randomInt(1, 12, randomFn) : 0;
+    const shiftText = shift > 0 ? ` + ${shift}` : '';
+    const shiftHint = shift > 0 ? ' + d' : '';
+
+    return buildTopicQuestion(
+      'de6_2',
+      `Amplitude: f(x) = ${amp} · ${fn}(${b}x)${shiftText} | A = ?`,
+      amp,
+      difficulty,
+      [
+        `Weg 1 (Parameter ablesen): In A · ${fn}(bx)${shiftHint} steht die Amplitude als Faktor vor ${fn}, also A = ${amp}.`,
+        `Weg 2 (Wertebereich): ${fn} pendelt zwischen -1 und +1; mit Faktor ${amp} beträgt der Ausschlag zur Mittellinie ${amp}.`
+      ]
+    );
+  }
+
+  if (variant === 'periodB') {
+    const b = randomInt(2, difficulty === 1 ? 7 : 14, randomFn);
+    const amp = difficulty >= 2 ? randomInt(2, 8, randomFn) : 1;
+    const fn = pickRandom(['sin', 'cos'], randomFn);
+    const ampPrefix = amp === 1 ? '' : `${amp} · `;
+
+    return buildTopicQuestion(
+      'de6_2',
+      `Periode 2π / b bei f(x) = ${ampPrefix}${fn}(${b}x) | b = ?`,
+      b,
+      difficulty,
+      [
+        `Weg 1 (Parameter b): In ${fn}(b · x) ist b der Faktor direkt vor x, hier also b = ${b}.`,
+        `Weg 2 (Schwingungen): Auf der Strecke 2π passen genau ${b} volle Perioden, deshalb Periode 2π / ${b} (b = ${b}).`
+      ]
+    );
+  }
+
+  if (variant === 'exactVal') {
+    const kind = pickRandom(['sin30', 'cos60', 'sin90', 'cos0', 'tan45', 'zero'], randomFn);
+    if (kind === 'sin30') {
+      const ans = randomInt(2, difficulty === 1 ? 12 : 25, randomFn);
+      const k = 2 * ans;
+      return buildTopicQuestion(
+        'de6_2',
+        `${k} · sin(30°) = ?`,
+        ans,
+        difficulty,
+        [
+          `Weg 1 (Standardwert): sin(30°) = 0,5, also ${k} · 0,5 = ${ans}.`,
+          `Weg 2 (Halbieren): Multiplikation mit sin(30°) = 1/2 bedeutet teilen durch 2: ${k} : 2 = ${ans}.`
+        ]
+      );
+    }
+
+    if (kind === 'cos60') {
+      const ans = randomInt(2, difficulty === 1 ? 12 : 25, randomFn);
+      const k = 2 * ans;
+      return buildTopicQuestion(
+        'de6_2',
+        `${k} · cos(60°) = ?`,
+        ans,
+        difficulty,
+        [
+          `Weg 1 (Standardwert): cos(60°) = 0,5, also ${k} · 0,5 = ${ans}.`,
+          `Weg 2 (Komplementwinkel): cos(60°) = sin(30°) = 1/2, daher ${k} : 2 = ${ans}.`
+        ]
+      );
+    }
+
+    if (kind === 'sin90' || kind === 'cos0' || kind === 'tan45') {
+      const k = randomInt(3, difficulty === 1 ? 15 : 30, randomFn);
+      const expr = kind === 'sin90' ? 'sin(90°)' : kind === 'cos0' ? 'cos(0°)' : 'tan(45°)';
+      const step2 = kind === 'tan45'
+        ? `Weg 2 (Dreieck): Bei 45° sind Gegen- und Ankathete gleich lang, somit tan(45°) = 1 und ${k} · 1 = ${k}.`
+        : `Weg 2 (Einheitskreis): Bei ${kind === 'sin90' ? '90° für sin' : '0° für cos'} liegt der Maximalwert 1 vor -> ${k}.`;
+
+      return buildTopicQuestion(
+        'de6_2',
+        `${k} · ${expr} = ?`,
+        k,
+        difficulty,
+        [
+          `Weg 1 (Funktionswert): ${expr} = 1, also ${k} · 1 = ${k}.`,
+          step2
+        ]
+      );
+    }
+
+    const k = randomInt(3, 25, randomFn);
+    const expr = pickRandom(['sin(0°)', 'cos(90°)'], randomFn);
+    return buildTopicQuestion(
+      'de6_2',
+      `${k} · ${expr} = ?`,
+      0,
+      difficulty,
+      [
+        `Weg 1 (Funktionswert): ${expr} = 0, also ${k} · 0 = 0.`,
+        `Weg 2 (Nullprodukt): Jede Zahl multipliziert mit 0 ergibt 0.`
+      ]
+    );
+  }
+
+  const amp = randomInt(2, 15, randomFn);
+  const b = randomInt(2, 6, randomFn);
+  const d = randomInt(1, 18, randomFn);
+  const fn = pickRandom(['sin', 'cos'], randomFn);
+  const ans = amp + d;
+
+  return buildTopicQuestion(
+    'de6_2',
+    `Maximalwert: f(x) = ${amp} · ${fn}(${b}x) + ${d} | max = ?`,
+    ans,
+    difficulty,
+    [
+      `Weg 1 (Maximum von ${fn}): Der größte Wert von ${fn}(${b}x) ist +1, also ${amp} · 1 + ${d} = ${ans}.`,
+      `Weg 2 (Mittellinie plus Amplitude): Die Schwingung geht von der Mittellinie ${d} um ${amp} nach oben: ${d} + ${amp} = ${ans}.`
+    ]
+  );
+}
+
+const TOPIC_GENERATORS = {
+  de1_1: generateDe1_1,
+  de2_1: generateDe2_1,
+  de2_2: generateDe2_2,
+  de3_1: generateDe3_1,
+  de3_2: generateDe3_2,
+  de4_1: generateDe4_1,
+  de4_2: generateDe4_2,
+  de5_1: generateDe5_1,
+  de5_2: generateDe5_2,
+  de6_1: generateDe6_1,
+  de6_2: generateDe6_2
+};
+
+// ---------------------------------------------------------------------------
+// Öffentliche Engine-API
+// ---------------------------------------------------------------------------
+
 /**
  * Bestimmt die Schwierigkeitsstufe (1-3) anhand des aktuellen Punktestands.
  * @param {number} score
@@ -535,7 +2099,7 @@ export function getDifficultyForScore(score) {
 }
 
 /**
- * Generiert eine neue Mathe-Aufgabe gemäß festem Daten-Vertrag.
+ * Generiert eine klassische V1.1 Mathe-Aufgabe gemäß festem 5-Key-Datenvertrag.
  * @param {number} [difficulty=1]
  * @param {() => number} [randomFn=Math.random]
  * @returns {{ id: string, category: string, questionText: string, correctAnswer: number, difficulty: number }}
@@ -553,17 +2117,85 @@ export function generateQuestion(difficulty = 1, randomFn = Math.random) {
 }
 
 /**
+ * Generiert eine Aufgabe für eine der 11 Themen-IDs inklusive Lösungswegen.
+ * @param {string} topicId
+ * @param {number} [difficulty=1]
+ * @param {() => number} [randomFn=Math.random]
+ */
+export function generateTopicQuestion(topicId, difficulty = 1, randomFn = Math.random) {
+  const generator = TOPIC_GENERATORS[topicId];
+  if (!generator) {
+    throw new Error(`Unbekannte Themen-ID: ${String(topicId)}`);
+  }
+  const level = normalizeDifficulty(difficulty);
+  return generator(level, randomFn);
+}
+
+/**
+ * Wählt eine Themen-ID anhand aktiver Themen und Gewichte (Weighted Random).
+ * @param {string[] | null | undefined} activeTopicIds
+ * @param {Record<string, number>} [weights={}]
+ * @param {() => number} [randomFn=Math.random]
+ * @returns {string | null}
+ */
+export function pickTopic(activeTopicIds, weights = {}, randomFn = Math.random) {
+  let pool;
+  if (activeTopicIds === undefined || activeTopicIds === null) {
+    pool = TOPICS.map((topic) => topic.id);
+  } else {
+    const rawList = Array.isArray(activeTopicIds) ? activeTopicIds : [];
+    if (rawList.length === 0) return null;
+    pool = [...new Set(rawList.filter((id) => TOPIC_MAP.has(id)))];
+    if (pool.length === 0) return null;
+  }
+
+  const weighted = pool.map((id) => {
+    const rawWeight = Number(weights?.[id]);
+    const weight = Number.isFinite(rawWeight) && rawWeight > 0 ? rawWeight : 1.0;
+    return { id, weight };
+  });
+
+  const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+  const target = safeRandom(randomFn) * totalWeight;
+
+  let acc = 0;
+  for (const entry of weighted) {
+    acc += entry.weight;
+    if (target < acc) {
+      return entry.id;
+    }
+  }
+
+  return weighted[weighted.length - 1].id;
+}
+
+/**
+ * Wählt ein gewichtetes Thema und generiert direkt die passende Aufgabe.
+ * @param {string[] | null | undefined} activeTopicIds
+ * @param {Record<string, number>} [weights={}]
+ * @param {number} [difficulty=1]
+ * @param {() => number} [randomFn=Math.random]
+ */
+export function generateWeightedQuestion(activeTopicIds, weights = {}, difficulty = 1, randomFn = Math.random) {
+  const topicId = pickTopic(activeTopicIds, weights, randomFn);
+  if (!topicId) return null;
+  return generateTopicQuestion(topicId, difficulty, randomFn);
+}
+
+/**
  * Prüft eine Nutzereingabe gegen die korrekte Antwort einer Aufgabe.
- * @param {{ correctAnswer: number }} question
+ * Unterstützt sowohl question.correctAnswer als auch question.answer.
+ * @param {{ correctAnswer?: number, answer?: number }} question
  * @param {string | number} rawInput
  * @returns {{ isCorrect: boolean, correctAnswer: number, userAnswer: number | null }}
  */
 export function checkAnswer(question, rawInput) {
+  const expectedAnswer = question?.correctAnswer ?? question?.answer;
   const trimmed = String(rawInput ?? '').trim();
   if (trimmed === '') {
     return {
       isCorrect: false,
-      correctAnswer: question.correctAnswer,
+      correctAnswer: expectedAnswer,
       userAnswer: null
     };
   }
@@ -572,14 +2204,14 @@ export function checkAnswer(question, rawInput) {
   if (!Number.isFinite(parsed)) {
     return {
       isCorrect: false,
-      correctAnswer: question.correctAnswer,
+      correctAnswer: expectedAnswer,
       userAnswer: null
     };
   }
 
   return {
-    isCorrect: parsed === question.correctAnswer,
-    correctAnswer: question.correctAnswer,
+    isCorrect: parsed === expectedAnswer,
+    correctAnswer: expectedAnswer,
     userAnswer: parsed
   };
 }
@@ -615,14 +2247,25 @@ function diffCalendarDays(earlierStr, laterStr) {
 }
 
 /**
+ * Normalisiert eine Timer-Dauer auf eine gültige Stufe aus TIMER_DURATIONS.
+ * @param {number} durationSeconds
+ * @returns {number}
+ */
+function normalizeTimerDuration(durationSeconds) {
+  const parsed = Number(durationSeconds);
+  return TIMER_DURATIONS.includes(parsed) ? parsed : GAME_DURATION_SECONDS;
+}
+
+/**
  * Berechnet das aktualisierte Nutzerprofil (Streak & Highscore) nach Spielende.
  * Bei score === 0 bleiben streak und lastPlayedDate unverändert.
+ * Optionaler 4. Parameter unterstützt Multi-Timer-Highscores ohne Veränderung des Standard-Rückgabeobjekts.
  * @param {{ streak: number, highScore: number, lastPlayedDate: string | null }} currentProfile
  * @param {number} score
  * @param {string} [todayStr=getLocalDateString()]
- * @returns {{ profile: { streak: number, highScore: number, lastPlayedDate: string | null }, isNewHighScore: boolean, streakIncreased: boolean }}
+ * @param {{ durationSeconds?: number, highScores?: Record<number, number> }} [options]
  */
-export function updateUserProfile(currentProfile, score, todayStr = getLocalDateString()) {
+export function updateUserProfile(currentProfile, score, todayStr = getLocalDateString(), options = undefined) {
   const prevStreak = Number.isInteger(currentProfile?.streak) && currentProfile.streak >= 0
     ? currentProfile.streak
     : 0;
@@ -635,8 +2278,9 @@ export function updateUserProfile(currentProfile, score, todayStr = getLocalDate
 
   const safeScore = Math.max(0, Math.floor(Number(score) || 0));
 
+  let baseResult;
   if (safeScore === 0) {
-    return {
+    baseResult = {
       profile: {
         streak: prevStreak,
         highScore: prevHighScore,
@@ -645,41 +2289,75 @@ export function updateUserProfile(currentProfile, score, todayStr = getLocalDate
       isNewHighScore: false,
       streakIncreased: false
     };
-  }
+  } else {
+    let nextStreak = 1;
+    let streakIncreased = false;
 
-  let nextStreak = 1;
-  let streakIncreased = false;
-
-  if (lastPlayed === todayStr) {
-    nextStreak = Math.max(1, prevStreak);
-    streakIncreased = prevStreak === 0;
-  } else if (lastPlayed !== null) {
-    const days = diffCalendarDays(lastPlayed, todayStr);
-    if (days === 1) {
-      nextStreak = prevStreak + 1;
-      streakIncreased = true;
-    } else if (days !== null && days < 0) {
+    if (lastPlayed === todayStr) {
       nextStreak = Math.max(1, prevStreak);
+      streakIncreased = prevStreak === 0;
+    } else if (lastPlayed !== null) {
+      const days = diffCalendarDays(lastPlayed, todayStr);
+      if (days === 1) {
+        nextStreak = prevStreak + 1;
+        streakIncreased = true;
+      } else if (days !== null && days < 0) {
+        nextStreak = Math.max(1, prevStreak);
+      } else {
+        nextStreak = 1;
+        streakIncreased = prevStreak === 0;
+      }
     } else {
       nextStreak = 1;
-      streakIncreased = prevStreak === 0;
+      streakIncreased = true;
     }
-  } else {
-    nextStreak = 1;
-    streakIncreased = true;
+
+    const isNewHighScore = safeScore > prevHighScore;
+    const nextHighScore = Math.max(prevHighScore, safeScore);
+
+    baseResult = {
+      profile: {
+        streak: nextStreak,
+        highScore: nextHighScore,
+        lastPlayedDate: todayStr
+      },
+      isNewHighScore,
+      streakIncreased
+    };
   }
 
-  const isNewHighScore = safeScore > prevHighScore;
-  const nextHighScore = Math.max(prevHighScore, safeScore);
+  if (options === undefined || options === null) {
+    return baseResult;
+  }
+
+  const durationSeconds = normalizeTimerDuration(options?.durationSeconds);
+  const nextHighScores = {};
+  for (const dur of TIMER_DURATIONS) {
+    const rawExisting = Number(options?.highScores?.[dur]);
+    const fallback = dur === GAME_DURATION_SECONDS ? prevHighScore : 0;
+    nextHighScores[dur] = Number.isInteger(rawExisting) && rawExisting >= 0 ? rawExisting : fallback;
+  }
+
+  const prevDurationHighScore = nextHighScores[durationSeconds];
+  const isNewDurationHighScore = safeScore > 0 && safeScore > prevDurationHighScore;
+  if (safeScore > 0) {
+    nextHighScores[durationSeconds] = Math.max(prevDurationHighScore, safeScore);
+  }
+
+  const nextLegacyHighScore = durationSeconds === GAME_DURATION_SECONDS
+    ? baseResult.profile.highScore
+    : prevHighScore;
 
   return {
     profile: {
-      streak: nextStreak,
-      highScore: nextHighScore,
-      lastPlayedDate: todayStr
+      ...baseResult.profile,
+      highScore: nextLegacyHighScore
     },
-    isNewHighScore,
-    streakIncreased
+    isNewHighScore: isNewDurationHighScore,
+    streakIncreased: baseResult.streakIncreased,
+    durationSeconds,
+    highScores: nextHighScores,
+    isNewDurationHighScore
   };
 }
 
@@ -689,10 +2367,110 @@ export function updateUserProfile(currentProfile, score, todayStr = getLocalDate
  * @returns {{ index: number, text: string }}
  */
 export function getRandomFunFact(randomFn = Math.random) {
-  const index = Math.floor(randomFn() * MATH_FUN_FACTS.length);
+  const index = Math.floor(safeRandom(randomFn) * MATH_FUN_FACTS.length);
   return {
     index,
     text: MATH_FUN_FACTS[index]
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Spiel-Verlauf (Session-History) & PPM
+// ---------------------------------------------------------------------------
+
+/**
+ * Erzeugt eine leere Session-History.
+ * @returns {Array}
+ */
+export function createSessionHistory() {
+  return [];
+}
+
+/**
+ * Erzeugt einen strukturierten Verlaufs-Eintrag aus Aufgabe und Prüfergebnis.
+ * @param {Record<string, any>} question
+ * @param {{ isCorrect?: boolean, userAnswer?: number | null }} checkResult
+ */
+export function createHistoryEntry(question, checkResult) {
+  return {
+    topicId: question?.topicId ?? null,
+    topicLabel: question?.topicLabel ?? question?.category ?? '',
+    question: question?.question ?? question?.questionText ?? '',
+    correctAnswer: question?.correctAnswer ?? question?.answer ?? null,
+    userAnswer: checkResult?.userAnswer ?? null,
+    isCorrect: Boolean(checkResult?.isCorrect),
+    steps: Array.isArray(question?.steps) ? [...question.steps] : [],
+    markedAsGap: false
+  };
+}
+
+/**
+ * Fügt ein Prüfergebnis unveränderlich (immutabel) an die Session-History an.
+ * @param {Array} history
+ * @param {Record<string, any>} question
+ * @param {{ isCorrect?: boolean, userAnswer?: number | null }} checkResult
+ * @returns {Array}
+ */
+export function recordSessionAnswer(history, question, checkResult) {
+  const safeHistory = Array.isArray(history) ? history : [];
+  return [...safeHistory, createHistoryEntry(question, checkResult)];
+}
+
+/**
+ * Markiert oder entmarkiert einen Eintrag in der Session-History als Wissenslücke.
+ * @param {Array} history
+ * @param {number} index
+ * @param {boolean} [marked=true]
+ * @returns {Array}
+ */
+export function setHistoryGap(history, index, marked = true) {
+  const safeHistory = Array.isArray(history) ? history : [];
+  if (!Number.isInteger(index) || index < 0 || index >= safeHistory.length) {
+    return [...safeHistory];
+  }
+
+  return safeHistory.map((entry, idx) => (
+    idx === index ? { ...entry, markedAsGap: Boolean(marked) } : entry
+  ));
+}
+
+/**
+ * Berechnet richtige Antworten pro Minute (PPM), auf 1 Nachkommastelle gerundet.
+ * @param {number} correctCount
+ * @param {number} [durationSeconds=GAME_DURATION_SECONDS]
+ * @returns {number}
+ */
+export function calculatePpm(correctCount, durationSeconds = GAME_DURATION_SECONDS) {
+  const safeCorrect = Number(correctCount);
+  const safeDuration = Number(durationSeconds);
+  if (!Number.isFinite(safeCorrect) || safeCorrect <= 0) return 0;
+  if (!Number.isFinite(safeDuration) || safeDuration <= 0) return 0;
+  return Math.round(((safeCorrect / safeDuration) * 60) * 10) / 10;
+}
+
+/**
+ * Erstellt die Gesamtauswertung einer Spielrunde.
+ * @param {Array} history
+ * @param {number} [durationSeconds=GAME_DURATION_SECONDS]
+ * @returns {{ total: number, correctCount: number, wrongCount: number, accuracyPercent: number, ppm: number, durationSeconds: number }}
+ */
+export function summarizeSession(history, durationSeconds = GAME_DURATION_SECONDS) {
+  const safeHistory = Array.isArray(history) ? history : [];
+  const total = safeHistory.length;
+  const correctCount = safeHistory.filter((entry) => Boolean(entry?.isCorrect)).length;
+  const wrongCount = total - correctCount;
+  const accuracyPercent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+  const rawDuration = Number(durationSeconds);
+  const safeDuration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 0;
+  const ppm = calculatePpm(correctCount, safeDuration);
+
+  return {
+    total,
+    correctCount,
+    wrongCount,
+    accuracyPercent,
+    ppm,
+    durationSeconds: safeDuration
   };
 }
 ```
@@ -1709,15 +3487,41 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {
   GAME_DURATION_SECONDS,
+  TIMER_DURATIONS,
   CATEGORIES,
+  TOPICS,
   MATH_FUN_FACTS,
   generateQuestion,
+  generateTopicQuestion,
+  pickTopic,
+  generateWeightedQuestion,
   getDifficultyForScore,
   checkAnswer,
   updateUserProfile,
-  getRandomFunFact
+  getRandomFunFact,
+  createSessionHistory,
+  createHistoryEntry,
+  recordSessionAnswer,
+  setHistoryGap,
+  calculatePpm,
+  summarizeSession
 } from './engine.js';
-import { loadUserData, saveUserData } from './storage.js';
+import {
+  TOPIC_IDS,
+  HIGHSCORE_DURATIONS,
+  WEIGHT_DEFAULT,
+  WEIGHT_MIN,
+  WEIGHT_MAX,
+  loadUserData,
+  saveUserData,
+  getWeights,
+  adjustWeight,
+  getTopGaps,
+  normalizeDuration,
+  getHighScores,
+  getHighScore,
+  saveHighScore
+} from './storage.js';
 
 test('Gesetz 1: engine.js greift niemals auf DOM oder localStorage zu', async () => {
   const source = await fs.readFile(new URL('./engine.js', import.meta.url), 'utf8');
@@ -1977,6 +3781,813 @@ test('Test D (DOM-Vertrags-Test): alle IDs aus ui.js und semantische data-Attrib
   }
   assert.ok(/\bdata-action=(['"])backspace\1/.test(htmlSource), 'data-action="backspace" fehlt in index.html');
   assert.ok(/\bdata-action=(['"])skip\1/.test(htmlSource), 'data-action="skip" fehlt in index.html');
+});
+
+// ---------------------------------------------------------------------------
+// V1.2 Tests (Phase 2 Teil 1: Themen, Gewichte, Multi-Timer-Highscores, History & PPM)
+// ---------------------------------------------------------------------------
+
+const FORBIDDEN_DASH_REGEX = /[\u2013\u2014]/;
+
+const SUPERSCRIPT_DIGITS = {
+  '⁰': '0',
+  '¹': '1',
+  '²': '2',
+  '³': '3',
+  '⁴': '4',
+  '⁵': '5',
+  '⁶': '6',
+  '⁷': '7',
+  '⁸': '8',
+  '⁹': '9'
+};
+
+const SUBSCRIPT_DIGITS = {
+  '₀': '0',
+  '₁': '1',
+  '₂': '2',
+  '₃': '3',
+  '₄': '4',
+  '₅': '5',
+  '₆': '6',
+  '₇': '7',
+  '₈': '8',
+  '₉': '9'
+};
+
+function parseUnicodeDigits(text, digitMap) {
+  return Number(
+    text
+      .split('')
+      .map((ch) => digitMap[ch] ?? ch)
+      .join('')
+  );
+}
+
+function createSeededRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function withMockLocalStorage(fn) {
+  const prevDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const store = new Map();
+  const mockStorage = {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: (key) => store.delete(key),
+    clear: () => store.clear()
+  };
+  globalThis.localStorage = mockStorage;
+  return Promise.resolve()
+    .then(() => fn(mockStorage, store))
+    .finally(() => {
+      if (prevDescriptor) {
+        Object.defineProperty(globalThis, 'localStorage', prevDescriptor);
+      } else {
+        delete globalThis.localStorage;
+      }
+    });
+}
+
+function assertValidV12QuestionContract(q, expectedTopicId, expectedLabel, expectedDifficulty) {
+  assert.equal(typeof q.id, 'string');
+  assert.ok(q.id.length > 0);
+  assert.equal(q.topicId, expectedTopicId);
+  assert.equal(typeof q.topicLabel, 'string');
+  assert.ok(q.topicLabel.length > 0);
+  assert.equal(q.topicLabel, expectedLabel);
+  assert.equal(typeof q.category, 'string');
+  assert.ok(q.category.length > 0);
+  assert.equal(q.category, expectedLabel);
+  assert.equal(typeof q.question, 'string');
+  assert.ok(q.question.length > 0);
+  assert.equal(q.questionText, q.question);
+  assert.equal(q.text, q.question);
+  assert.equal(FORBIDDEN_DASH_REGEX.test(q.question), false, `Gedankenstrich in Frage: ${q.question}`);
+
+  assert.equal(typeof q.answer, 'number');
+  assert.ok(Number.isInteger(q.answer), `Antwort muss ganzzahlig sein: ${q.answer}`);
+  assert.ok(q.answer >= 0, `Antwort muss >= 0 sein: ${q.answer}`);
+  assert.equal(q.correctAnswer, q.answer);
+  assert.equal(q.difficulty, expectedDifficulty);
+
+  assert.ok(Array.isArray(q.steps), 'steps muss ein Array sein');
+  assert.ok(q.steps.length >= 2, `Mindestens 2 Lösungswege erwartet, erhalten: ${q.steps.length}`);
+  for (const step of q.steps) {
+    assert.equal(typeof step, 'string');
+    assert.ok(step.trim().length > 0, 'Lösungsweg darf nicht leer sein');
+    assert.equal(FORBIDDEN_DASH_REGEX.test(step), false, `Gedankenstrich in step: ${step}`);
+  }
+}
+
+function verifyTopicQuestionMath(q) {
+  const { topicId, question, answer } = q;
+  let m;
+
+  if (topicId === 'de1_1') {
+    if ((m = question.match(/^(\d+) \+ (\d+) = \?$/))) {
+      assert.equal(answer, Number(m[1]) + Number(m[2]), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+) - (\d+) = \?$/))) {
+      assert.equal(answer, Number(m[1]) - Number(m[2]), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+) · (\d+) = \?$/))) {
+      assert.equal(answer, Number(m[1]) * Number(m[2]), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+) : (\d+) = \?$/))) {
+      assert.equal(Number(m[1]), Number(m[2]) * answer, question);
+      return;
+    }
+  } else if (topicId === 'de2_1') {
+    if ((m = question.match(/^(\d+)\/(\d+) von (\d+) = \?$/))) {
+      assert.equal((Number(m[1]) * Number(m[3])) % Number(m[2]), 0, question);
+      assert.equal(answer, (Number(m[1]) * Number(m[3])) / Number(m[2]), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+)\/(\d+) = \?\/(\d+)$/))) {
+      assert.equal(Number(m[1]) * Number(m[3]), answer * Number(m[2]), question);
+      return;
+    }
+  } else if (topicId === 'de2_2') {
+    if ((m = question.match(/^(\d+)\/(\d+) ([+-]) (\d+)\/(\d+) = \?\/(\d+)$/))) {
+      const a = Number(m[1]);
+      const d1 = Number(m[2]);
+      const op = m[3];
+      const b = Number(m[4]);
+      const d2 = Number(m[5]);
+      const commonDen = Number(m[6]);
+      const left = op === '+' ? a * d2 + b * d1 : a * d2 - b * d1;
+      assert.equal(left * commonDen, answer * d1 * d2, question);
+      return;
+    }
+    if ((m = question.match(/^(\d+) : \((\d+)\/(\d+)\) = \?$/))) {
+      assert.equal(Number(m[1]) * Number(m[3]), answer * Number(m[2]), question);
+      return;
+    }
+    if ((m = question.match(/^\((\d+)\/(\d+)\) · \((\d+)\/(\d+)\) = \?$/))) {
+      assert.equal(Number(m[1]) * Number(m[3]), answer * Number(m[2]) * Number(m[4]), question);
+      return;
+    }
+  } else if (topicId === 'de3_1') {
+    if ((m = question.match(/^(\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) · (\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) = (\d+)\^\?$/))) {
+      assert.equal(m[1], m[3], question);
+      assert.equal(m[1], m[5], question);
+      const e1 = parseUnicodeDigits(m[2], SUPERSCRIPT_DIGITS);
+      const e2 = parseUnicodeDigits(m[4], SUPERSCRIPT_DIGITS);
+      assert.equal(answer, e1 + e2, question);
+      return;
+    }
+    if ((m = question.match(/^\((\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+)\)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) = (\d+)\^\?$/))) {
+      assert.equal(m[1], m[4], question);
+      const e1 = parseUnicodeDigits(m[2], SUPERSCRIPT_DIGITS);
+      const e2 = parseUnicodeDigits(m[3], SUPERSCRIPT_DIGITS);
+      assert.equal(answer, e1 * e2, question);
+      return;
+    }
+    if ((m = question.match(/^(\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) : (\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) = (\d+)\^\?$/))) {
+      assert.equal(m[1], m[3], question);
+      assert.equal(m[1], m[5], question);
+      const e1 = parseUnicodeDigits(m[2], SUPERSCRIPT_DIGITS);
+      const e2 = parseUnicodeDigits(m[4], SUPERSCRIPT_DIGITS);
+      assert.equal(answer, e1 - e2, question);
+      return;
+    }
+    if ((m = question.match(/^(\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) : (\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) = \?$/))) {
+      assert.equal(m[1], m[3], question);
+      const e1 = parseUnicodeDigits(m[2], SUPERSCRIPT_DIGITS);
+      const e2 = parseUnicodeDigits(m[4], SUPERSCRIPT_DIGITS);
+      assert.equal(answer, Number(m[1]) ** (e1 - e2), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) · (\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+) = \?([⁰¹²³⁴⁵⁶⁷⁸⁹]+)$/))) {
+      assert.equal(m[2], m[4], question);
+      assert.equal(m[2], m[5], question);
+      assert.equal(answer, Number(m[1]) * Number(m[3]), question);
+      return;
+    }
+  } else if (topicId === 'de3_2') {
+    if ((m = question.match(/^log([₀₁₂₃₄₅₆₇₈₉]+)\((\d+)\) = \?$/))) {
+      const base = parseUnicodeDigits(m[1], SUBSCRIPT_DIGITS);
+      assert.equal(base ** answer, Number(m[2]), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+)\^x = (\d+) \| x = \?$/))) {
+      assert.equal(Number(m[1]) ** answer, Number(m[2]), question);
+      return;
+    }
+    if ((m = question.match(/^log([₀₁₂₃₄₅₆₇₈₉]+)\((\d+)\) - log([₀₁₂₃₄₅₆₇₈₉]+)\((\d+)\) = \?$/))) {
+      const b1 = parseUnicodeDigits(m[1], SUBSCRIPT_DIGITS);
+      const b2 = parseUnicodeDigits(m[3], SUBSCRIPT_DIGITS);
+      assert.equal(b1, b2, question);
+      assert.equal((b1 ** answer) * Number(m[4]), Number(m[2]), question);
+      return;
+    }
+  } else if (topicId === 'de4_1') {
+    if ((m = question.match(/^(\d+)x ([+-]) (\d+) = (\d+) \| x = \?$/))) {
+      const a = Number(m[1]);
+      const b = Number(m[3]);
+      const c = Number(m[4]);
+      const lhs = m[2] === '+' ? a * answer + b : a * answer - b;
+      assert.equal(lhs, c, question);
+      return;
+    }
+    if ((m = question.match(/^(\d+)\(x ([+-]) (\d+)\) = (\d+) \| x = \?$/))) {
+      const a = Number(m[1]);
+      const b = Number(m[3]);
+      const c = Number(m[4]);
+      const lhs = a * (m[2] === '+' ? answer + b : answer - b);
+      assert.equal(lhs, c, question);
+      return;
+    }
+    if ((m = question.match(/^(\d+)x \+ (\d+) = (\d*)x \+ (\d+) \| x = \?$/))) {
+      const a = Number(m[1]);
+      const b = Number(m[2]);
+      const d = m[3] === '' ? 1 : Number(m[3]);
+      const c = Number(m[4]);
+      assert.equal(a * answer + b, d * answer + c, question);
+      return;
+    }
+  } else if (topicId === 'de4_2') {
+    if ((m = question.match(/^x \+ y = (\d+), x - y = (\d+) \| ([xy]) = \?$/))) {
+      const sum = Number(m[1]);
+      const diff = Number(m[2]);
+      if (m[3] === 'x') {
+        assert.equal(2 * answer, sum + diff, question);
+        assert.ok(sum - answer >= 0, question);
+      } else {
+        assert.equal(2 * answer, sum - diff, question);
+        assert.ok(sum - answer >= 0, question);
+      }
+      return;
+    }
+    if ((m = question.match(/^y = (\d+)x, (\d*)x \+ y = (\d+) \| ([xy]) = \?$/))) {
+      const k = Number(m[1]);
+      const a = m[2] === '' ? 1 : Number(m[2]);
+      const total = Number(m[3]);
+      if (m[4] === 'x') {
+        assert.equal((a + k) * answer, total, question);
+      } else {
+        assert.equal(answer % k, 0, question);
+        assert.equal((a + k) * (answer / k), total, question);
+      }
+      return;
+    }
+    if ((m = question.match(/^x \+ (\d+)y = (\d+), x \+ (\d*)y = (\d+) \| ([xy]) = \?$/))) {
+      const a = Number(m[1]);
+      const c1 = Number(m[2]);
+      const b = m[3] === '' ? 1 : Number(m[3]);
+      const c2 = Number(m[4]);
+      if (m[5] === 'x') {
+        assert.equal((c1 - c2) % (a - b), 0, question);
+        const y = (c1 - c2) / (a - b);
+        assert.equal(answer + b * y, c2, question);
+      } else {
+        assert.equal(c1 - a * answer, c2 - b * answer, question);
+      }
+      return;
+    }
+  } else if (topicId === 'de5_1') {
+    if ((m = question.match(/^f\(x\) = (\d+)x ([+-]) (\d+) \| f\((\d+)\) = \?$/))) {
+      const slope = Number(m[1]);
+      const c = Number(m[3]);
+      const x0 = Number(m[4]);
+      const expected = m[2] === '+' ? slope * x0 + c : slope * x0 - c;
+      assert.equal(answer, expected, question);
+      return;
+    }
+    if ((m = question.match(/^Nullstelle: f\(x\) = (\d+)x - (\d+) \| x = \?$/))) {
+      assert.equal(Number(m[1]) * answer - Number(m[2]), 0, question);
+      return;
+    }
+    if ((m = question.match(/^f\(x\) = mx \+ (\d+) mit f\((\d+)\) = (\d+) \| m = \?$/))) {
+      assert.equal(answer * Number(m[2]) + Number(m[1]), Number(m[3]), question);
+      return;
+    }
+  } else if (topicId === 'de5_2') {
+    if ((m = question.match(/^Scheitel-x: f\(x\) = (\d*)\(x - (\d+)\)² \+ (\d+) \| x = \?$/))) {
+      assert.equal(answer, Number(m[2]), question);
+      return;
+    }
+    if ((m = question.match(/^Minimum-y: f\(x\) = (\d*)\(x - (\d+)\)² \+ (\d+) \| y = \?$/))) {
+      assert.equal(answer, Number(m[3]), question);
+      return;
+    }
+    if ((m = question.match(/^Pos\. Nullstelle: f\(x\) = (\d*)x² - (\d+) \| x = \?$/))) {
+      const a = m[1] === '' ? 1 : Number(m[1]);
+      assert.equal(a * answer * answer - Number(m[2]), 0, question);
+      assert.ok(answer > 0, question);
+      return;
+    }
+    if ((m = question.match(/^f\(x\) = \(x - (\d+)\)² \+ (\d+) \| f\((\d+)\) = \?$/))) {
+      const xs = Number(m[1]);
+      const ys = Number(m[2]);
+      const x0 = Number(m[3]);
+      assert.equal(answer, (x0 - xs) ** 2 + ys, question);
+      return;
+    }
+  } else if (topicId === 'de6_1') {
+    if ((m = question.match(/^Dreieck \(90°\): a = (\d+), Hypotenuse c = (\d+) \| b = \?$/))) {
+      const a = Number(m[1]);
+      const c = Number(m[2]);
+      assert.equal(a * a + answer * answer, c * c, question);
+      return;
+    }
+    if ((m = question.match(/^Dreieck \(90°\): a = (\d+), b = (\d+) \| c = \?$/))) {
+      const a = Number(m[1]);
+      const b = Number(m[2]);
+      assert.equal(a * a + b * b, answer * answer, question);
+      return;
+    }
+    if ((m = question.match(/^sin\(30°\) = 0,5, Gegenkathete a = (\d+) \| c = \?$/))) {
+      assert.equal(answer, 2 * Number(m[1]), question);
+      return;
+    }
+    if ((m = question.match(/^sin\(30°\) = 0,5, c = (\d+) \| a = \?$/))) {
+      assert.equal(2 * answer, Number(m[1]), question);
+      return;
+    }
+    if ((m = question.match(/^cos\(60°\) = 0,5, Ankathete b = (\d+) \| c = \?$/))) {
+      assert.equal(answer, 2 * Number(m[1]), question);
+      return;
+    }
+    if ((m = question.match(/^cos\(60°\) = 0,5, c = (\d+) \| b = \?$/))) {
+      assert.equal(2 * answer, Number(m[1]), question);
+      return;
+    }
+    if ((m = question.match(/^Dreieck \(90°, alpha = 45°\): Ankathete b = (\d+) \| a = \?$/))) {
+      assert.equal(answer, Number(m[1]), question);
+      return;
+    }
+  } else if (topicId === 'de6_2') {
+    if ((m = question.match(/^Amplitude: f\(x\) = (\d+) · (?:sin|cos)\(\d+x\)(?: \+ \d+)? \| A = \?$/))) {
+      assert.equal(answer, Number(m[1]), question);
+      return;
+    }
+    if ((m = question.match(/^Periode 2π \/ b bei f\(x\) = (?:\d+ · )?(?:sin|cos)\((\d+)x\) \| b = \?$/))) {
+      assert.equal(answer, Number(m[1]), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+) · (?:sin\(30°\)|cos\(60°\)) = \?$/))) {
+      assert.equal(2 * answer, Number(m[1]), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+) · (?:sin\(90°\)|cos\(0°\)|tan\(45°\)) = \?$/))) {
+      assert.equal(answer, Number(m[1]), question);
+      return;
+    }
+    if ((m = question.match(/^(\d+) · (?:sin\(0°\)|cos\(90°\)) = \?$/))) {
+      assert.equal(answer, 0, question);
+      return;
+    }
+    if ((m = question.match(/^Maximalwert: f\(x\) = (\d+) · (?:sin|cos)\(\d+x\) \+ (\d+) \| max = \?$/))) {
+      assert.equal(answer, Number(m[1]) + Number(m[2]), question);
+      return;
+    }
+  }
+
+  assert.fail(`Unerwartetes Aufgabenformat für ${topicId}: ${question}`);
+}
+
+test('V1.2 TOPICS und TIMER_DURATIONS erfüllen den Spezifikations-Vertrag', () => {
+  const expectedTopics = [
+    { id: 'de1_1', label: 'DE 1.1 Grundlagen' },
+    { id: 'de2_1', label: 'DE 2.1 Brüche (Grundlagen)' },
+    { id: 'de2_2', label: 'DE 2.2 Brüche (Fortgeschritten)' },
+    { id: 'de3_1', label: 'DE 3.1 Terme - Potenzgesetze' },
+    { id: 'de3_2', label: 'DE 3.2 Terme - Exponenten und Logarithmen' },
+    { id: 'de4_1', label: 'DE 4.1 Gleichungen' },
+    { id: 'de4_2', label: 'DE 4.2 Lineare Gleichungssysteme' },
+    { id: 'de5_1', label: 'DE 5.1 Funktionen (Geraden)' },
+    { id: 'de5_2', label: 'DE 5.2 Funktionen (Fortgeschritten)' },
+    { id: 'de6_1', label: 'DE 6.1 Technik - Trigonometrie am Dreieck' },
+    { id: 'de6_2', label: 'DE 6.2 Technik - Trigonometrische Funktionen' }
+  ];
+
+  assert.equal(TOPICS.length, 11);
+  assert.equal(Object.isFrozen(TOPICS), true);
+  assert.deepEqual(TOPICS, expectedTopics);
+  for (const topic of TOPICS) {
+    assert.equal(FORBIDDEN_DASH_REGEX.test(topic.label), false);
+  }
+
+  assert.deepEqual(TOPIC_IDS, expectedTopics.map((topic) => topic.id));
+  assert.deepEqual(TIMER_DURATIONS, [60, 120, 300, 600]);
+  assert.deepEqual(HIGHSCORE_DURATIONS, [60, 120, 300, 600]);
+});
+
+test('V1.2 generateTopicQuestion liefert für alle 11 Themen und Stufen 1 bis 3 gültige und korrekte Aufgaben', () => {
+  const rand = createSeededRandom(20261113);
+  const constantBoundaryRandoms = [() => 0, () => 0.49, () => 0.99];
+
+  for (const topic of TOPICS) {
+    for (let difficulty = 1; difficulty <= 3; difficulty += 1) {
+      for (const boundaryRand of constantBoundaryRandoms) {
+        const qBoundary = generateTopicQuestion(topic.id, difficulty, boundaryRand);
+        assertValidV12QuestionContract(qBoundary, topic.id, topic.label, difficulty);
+        verifyTopicQuestionMath(qBoundary);
+      }
+
+      for (let sample = 0; sample < 25; sample += 1) {
+        const q = generateTopicQuestion(topic.id, difficulty, rand);
+        assertValidV12QuestionContract(q, topic.id, topic.label, difficulty);
+        verifyTopicQuestionMath(q);
+
+        const checkOk = checkAnswer(q, String(q.answer));
+        assert.deepEqual(checkOk, {
+          isCorrect: true,
+          correctAnswer: q.answer,
+          userAnswer: q.answer
+        });
+      }
+    }
+  }
+
+  assert.throws(() => generateTopicQuestion('unbekanntes_thema', 1), /Unbekannte Themen-ID/);
+});
+
+test('V1.2 generateTopicQuestion deterministische Stichproben über alle 11 Themen', () => {
+  const deterministicChecks = [
+    { topicId: 'de1_1', difficulty: 1, values: [0.05, 0.25, 0.5], expectedQuestion: '21 + 25 = ?', expectedAnswer: 46 },
+    { topicId: 'de1_1', difficulty: 2, values: [0.3, 0.5, 0.2], expectedQuestion: '75 - 46 = ?', expectedAnswer: 29 },
+    { topicId: 'de2_1', difficulty: 1, values: [0.1, 0.1, 0.5], expectedQuestion: '1/3 von 18 = ?', expectedAnswer: 6 },
+    { topicId: 'de2_2', difficulty: 2, values: [0.4, 0.2, 0.3, 0.5], expectedQuestion: '9 : (3/4) = ?', expectedAnswer: 12 },
+    { topicId: 'de3_1', difficulty: 1, values: [0.05, 0.5, 0.25, 0.75], expectedQuestion: '4³ · 4⁵ = 4^?', expectedAnswer: 8 },
+    { topicId: 'de3_2', difficulty: 2, values: [0.1, 0.99], expectedQuestion: 'log₂(1) = ?', expectedAnswer: 0 },
+    { topicId: 'de4_1', difficulty: 1, values: [0.1, 0.2, 0.5, 0.1, 0.3], expectedQuestion: '2x - 4 = 6 | x = ?', expectedAnswer: 5 },
+    { topicId: 'de4_2', difficulty: 2, values: [0.1, 0.5, 0.2, 0.2], expectedQuestion: 'x + y = 17, x - y = 3 | y = ?', expectedAnswer: 7 },
+    { topicId: 'de5_1', difficulty: 2, values: [0.4, 0.5, 0.3], expectedQuestion: 'Nullstelle: f(x) = 7x - 35 | x = ?', expectedAnswer: 5 },
+    { topicId: 'de5_2', difficulty: 3, values: [0.6, 0.2, 0.4], expectedQuestion: 'Pos. Nullstelle: f(x) = 3x² - 48 | x = ?', expectedAnswer: 4 },
+    { topicId: 'de6_1', difficulty: 1, values: [0.1, 0.2, 0.5], expectedQuestion: 'Dreieck (90°): a = 9, b = 12 | c = ?', expectedAnswer: 15 },
+    { topicId: 'de6_2', difficulty: 2, values: [0.6, 0.95, 0.5, 0.1], expectedQuestion: '14 · sin(0°) = ?', expectedAnswer: 0 }
+  ];
+
+  for (const spec of deterministicChecks) {
+    let idx = 0;
+    const seqRand = () => {
+      const v = spec.values[idx % spec.values.length];
+      idx += 1;
+      return v;
+    };
+    const q = generateTopicQuestion(spec.topicId, spec.difficulty, seqRand);
+    assert.equal(q.question, spec.expectedQuestion);
+    assert.equal(q.answer, spec.expectedAnswer);
+    assert.equal(q.correctAnswer, spec.expectedAnswer);
+    verifyTopicQuestionMath(q);
+    assert.equal(checkAnswer(q, String(spec.expectedAnswer)).isCorrect, true);
+  }
+});
+
+test('V1.2 pickTopic und generateWeightedQuestion unterstützen Gewichtung und Randfälle', () => {
+  assert.equal(pickTopic([], { de1_1: 2.0 }, () => 0.5), null);
+  assert.equal(pickTopic(['nicht_existent'], { de1_1: 2.0 }, () => 0.5), null);
+
+  // undefined nutzt alle 11 Themen gleichgewichtet
+  const seenAll = new Set();
+  for (let i = 0; i < TOPICS.length; i += 1) {
+    const picked = pickTopic(undefined, {}, () => (i + 0.5) / TOPICS.length);
+    seenAll.add(picked);
+  }
+  assert.equal(seenAll.size, 11);
+
+  // Gewichtete Verteilung: 2.5 vs 1.0 ergibt ca. 71 % vs 29 %
+  const weightedCounts = { de1_1: 0, de2_1: 0 };
+  for (let i = 0; i < 100; i += 1) {
+    const picked = pickTopic(['de1_1', 'de2_1'], { de1_1: 1.0, de2_1: 2.5 }, () => (i + 0.5) / 100);
+    weightedCounts[picked] += 1;
+  }
+  assert.equal(weightedCounts.de1_1, 29);
+  assert.equal(weightedCounts.de2_1, 71);
+  assert.ok(weightedCounts.de2_1 > weightedCounts.de1_1);
+
+  // Fehlende oder ungültige Gewichte fallen auf 1.0 zurück
+  const fallbackCounts = { de1_1: 0, de2_1: 0, de3_1: 0 };
+  for (let i = 0; i < 100; i += 1) {
+    const picked = pickTopic(
+      ['de1_1', 'de2_1', 'de3_1'],
+      { de1_1: 2.0, de2_1: -5, de3_1: Number.NaN },
+      () => (i + 0.5) / 100
+    );
+    fallbackCounts[picked] += 1;
+  }
+  assert.deepEqual(fallbackCounts, { de1_1: 50, de2_1: 25, de3_1: 25 });
+
+  // generateWeightedQuestion liefert vollständige V1.2-Aufgabe oder null bei leerer Liste
+  assert.equal(generateWeightedQuestion([], { de1_1: 1.5 }, 1, () => 0.5), null);
+
+  const rand = createSeededRandom(98765);
+  const active = ['de4_1', 'de5_2'];
+  const weightedQ = generateWeightedQuestion(active, { de4_1: 1.0, de5_2: 2.5 }, 3, rand);
+  assert.ok(weightedQ !== null);
+  assert.ok(active.includes(weightedQ.topicId));
+  const topicMeta = TOPICS.find((t) => t.id === weightedQ.topicId);
+  assertValidV12QuestionContract(weightedQ, topicMeta.id, topicMeta.label, 3);
+  verifyTopicQuestionMath(weightedQ);
+});
+
+test('V1.2 storage.js Gewichte: Initialisierung, Deltas, Rundung, Grenzen, Kaputt-JSON und getTopGaps', async () => {
+  assert.equal(WEIGHT_DEFAULT, 1.0);
+  assert.equal(WEIGHT_MIN, 1.0);
+  assert.equal(WEIGHT_MAX, 2.5);
+
+  await withMockLocalStorage((mockStorage) => {
+    const initial = getWeights();
+    assert.deepEqual(Object.keys(initial), TOPIC_IDS);
+    for (const id of TOPIC_IDS) {
+      assert.equal(initial[id], 1.0);
+    }
+
+    // wrong (+0.15) und Rundung auf 2 Nachkommastellen
+    let w = adjustWeight('de1_1', 'wrong');
+    assert.equal(w.de1_1, 1.15);
+    w = adjustWeight('de1_1', 'wrong');
+    assert.equal(w.de1_1, 1.3);
+    w = adjustWeight('de1_1', 'wrong');
+    assert.equal(w.de1_1, 1.45);
+
+    // correct (-0.05) und Untergrenze 1.0
+    w = adjustWeight('de1_1', 'correct');
+    assert.equal(w.de1_1, 1.4);
+    w = adjustWeight('de1_1', 'wrong');
+    assert.equal(w.de1_1, 1.55);
+    w = adjustWeight('de2_1', 'correct');
+    assert.equal(w.de2_1, 1.0);
+
+    // gap (+0.40) und Cap 2.5
+    w = adjustWeight('de3_1', 'gap');
+    assert.equal(w.de3_1, 1.4);
+    w = adjustWeight('de3_1', 'gap');
+    assert.equal(w.de3_1, 1.8);
+    w = adjustWeight('de3_1', 'gap');
+    assert.equal(w.de3_1, 2.2);
+    w = adjustWeight('de3_1', 'gap');
+    assert.equal(w.de3_1, 2.5);
+
+    // Unbekannte topicId oder unbekanntes outcome verändert nichts
+    const beforeRaw = mockStorage.getItem('kopfrechen_weights_v1');
+    const unchangedTopic = adjustWeight('unbekannt', 'wrong');
+    assert.deepEqual(unchangedTopic, w);
+    assert.equal(mockStorage.getItem('kopfrechen_weights_v1'), beforeRaw);
+
+    const unchangedOutcome = adjustWeight('de1_1', 'skip_unknown');
+    assert.deepEqual(unchangedOutcome, w);
+    assert.equal(mockStorage.getItem('kopfrechen_weights_v1'), beforeRaw);
+
+    // getTopGaps: nur > 1.0, absteigend sortiert, Tie-Break nach TOPIC_IDS, Limit beachten
+    adjustWeight('de5_2', 'gap'); // 1.4
+    adjustWeight('de5_2', 'wrong'); // 1.55 (Gleichstand mit de1_1)
+    adjustWeight('de4_2', 'wrong'); // 1.15
+    assert.deepEqual(getTopGaps(), ['de3_1', 'de1_1', 'de5_2']);
+    assert.deepEqual(getTopGaps(2), ['de3_1', 'de1_1']);
+    assert.deepEqual(getTopGaps(10), ['de3_1', 'de1_1', 'de5_2', 'de4_2']);
+    assert.deepEqual(getTopGaps(0), []);
+    assert.deepEqual(getTopGaps(-3), []);
+
+    // Kaputtes JSON und ungültige Werte sicher abfangen
+    mockStorage.setItem('kopfrechen_weights_v1', '{kaputt');
+    const afterCorrupt = getWeights();
+    for (const id of TOPIC_IDS) {
+      assert.equal(afterCorrupt[id], 1.0);
+    }
+
+    mockStorage.setItem('kopfrechen_weights_v1', JSON.stringify(['ungueltig']));
+    const afterArray = getWeights();
+    for (const id of TOPIC_IDS) {
+      assert.equal(afterArray[id], 1.0);
+    }
+
+    mockStorage.setItem(
+      'kopfrechen_weights_v1',
+      JSON.stringify({ de1_1: 9.99, de2_1: 0.4, de3_1: 1.236, de4_1: 'text' })
+    );
+    const clamped = getWeights();
+    assert.equal(clamped.de1_1, 2.5);
+    assert.equal(clamped.de2_1, 1.0);
+    assert.equal(clamped.de3_1, 1.24);
+    assert.equal(clamped.de4_1, 1.0);
+  });
+});
+
+test('V1.2 storage.js Multi-Timer-Highscores: Zeitstufen, Maximum, Migration und 60s-Sync', async () => {
+  assert.equal(normalizeDuration(), 60);
+  assert.equal(normalizeDuration(null), 60);
+  assert.equal(normalizeDuration(''), 60);
+  assert.equal(normalizeDuration(45), 60);
+  assert.equal(normalizeDuration('90'), 60);
+  assert.equal(normalizeDuration(Number.NaN), 60);
+  assert.equal(normalizeDuration(60), 60);
+  assert.equal(normalizeDuration(120), 120);
+  assert.equal(normalizeDuration('300'), 300);
+  assert.equal(normalizeDuration(600), 600);
+
+  await withMockLocalStorage(async (mockStorage) => {
+    assert.deepEqual(getHighScores(), { 60: 0, 120: 0, 300: 0, 600: 0 });
+    assert.equal(getHighScore(), 0);
+
+    // Bestehenden 60s-Highscore aus kopfrechen_user_data_v1 übernehmen
+    mockStorage.setItem(
+      'kopfrechen_user_data_v1',
+      JSON.stringify({ streak: 5, highScore: 19, lastPlayedDate: '2026-11-12' })
+    );
+    assert.deepEqual(getHighScores(), { 60: 19, 120: 0, 300: 0, 600: 0 });
+    assert.equal(getHighScore(60), 19);
+
+    // Niedrigerer Score bei 60s überschreibt nicht
+    const below60 = saveHighScore(15, 60);
+    assert.deepEqual(below60, {
+      durationSeconds: 60,
+      highScore: 19,
+      isNewHighScore: false,
+      highScores: { 60: 19, 120: 0, 300: 0, 600: 0 }
+    });
+
+    // Neuer 60s-Rekord synchronisiert auch kopfrechen_user_data_v1
+    const beat60 = saveHighScore(24, 60);
+    assert.deepEqual(beat60, {
+      durationSeconds: 60,
+      highScore: 24,
+      isNewHighScore: true,
+      highScores: { 60: 24, 120: 0, 300: 0, 600: 0 }
+    });
+    assert.deepEqual(await loadUserData(), {
+      streak: 5,
+      highScore: 24,
+      lastPlayedDate: '2026-11-12'
+    });
+
+    // Andere Zeitstufen speichern unabhängig und verändern 60s-Profil nicht
+    const new120 = saveHighScore(38, 120);
+    assert.deepEqual(new120, {
+      durationSeconds: 120,
+      highScore: 38,
+      isNewHighScore: true,
+      highScores: { 60: 24, 120: 38, 300: 0, 600: 0 }
+    });
+    assert.deepEqual(saveHighScore(38, 120), {
+      durationSeconds: 120,
+      highScore: 38,
+      isNewHighScore: false,
+      highScores: { 60: 24, 120: 38, 300: 0, 600: 0 }
+    });
+    assert.equal(saveHighScore(30, 120).isNewHighScore, false);
+    assert.equal(getHighScore(120), 38);
+
+    assert.equal(saveHighScore(52, 300).isNewHighScore, true);
+    assert.equal(saveHighScore(88, 600).isNewHighScore, true);
+    assert.deepEqual(getHighScores(), { 60: 24, 120: 38, 300: 52, 600: 88 });
+    assert.equal((await loadUserData()).highScore, 24);
+
+    // Fehlender oder ungültiger Dauer-Parameter fällt auf 60 zurück
+    const defaultSaved = saveHighScore(29);
+    assert.equal(defaultSaved.durationSeconds, 60);
+    assert.equal(defaultSaved.isNewHighScore, true);
+    assert.equal(getHighScore(), 29);
+
+    const invalidSaved = saveHighScore(31, 999);
+    assert.equal(invalidSaved.durationSeconds, 60);
+    assert.equal(invalidSaved.isNewHighScore, true);
+    assert.equal((await loadUserData()).highScore, 31);
+
+    // Kaputtes JSON in kopfrechen_highscores_v1 fällt sicher auf 0 bzw. 60s-Profilwert zurück
+    mockStorage.setItem('kopfrechen_highscores_v1', '{kaputt');
+    assert.deepEqual(getHighScores(), { 60: 31, 120: 0, 300: 0, 600: 0 });
+  });
+});
+
+test('V1.2 engine.js Session-History, Gap-Markierung, PPM und summarizeSession', () => {
+  const q1 = generateTopicQuestion('de1_1', 1, () => 0.1);
+  const q2 = generateTopicQuestion('de3_2', 2, () => 0.25);
+  const q3 = generateTopicQuestion('de6_1', 3, () => 0.4);
+
+  const h0 = createSessionHistory();
+  assert.deepEqual(h0, []);
+
+  // Richtige Antwort
+  const h1 = recordSessionAnswer(h0, q1, checkAnswer(q1, String(q1.answer)));
+  // Übersprungene Aufgabe (leere Eingabe -> userAnswer: null)
+  const h2 = recordSessionAnswer(h1, q2, checkAnswer(q2, ''));
+  // Falsche Zahleneingabe
+  const wrongInput = q3.answer + 1;
+  const h3 = recordSessionAnswer(h2, q3, checkAnswer(q3, String(wrongInput)));
+
+  // Immutabilität prüfen
+  assert.equal(h0.length, 0);
+  assert.equal(h1.length, 1);
+  assert.equal(h2.length, 2);
+  assert.equal(h3.length, 3);
+
+  assert.deepEqual(h3[0], {
+    topicId: q1.topicId,
+    topicLabel: q1.topicLabel,
+    question: q1.question,
+    correctAnswer: q1.answer,
+    userAnswer: q1.answer,
+    isCorrect: true,
+    steps: q1.steps,
+    markedAsGap: false
+  });
+  assert.deepEqual(h3[1], {
+    topicId: q2.topicId,
+    topicLabel: q2.topicLabel,
+    question: q2.question,
+    correctAnswer: q2.answer,
+    userAnswer: null,
+    isCorrect: false,
+    steps: q2.steps,
+    markedAsGap: false
+  });
+  assert.deepEqual(h3[2], {
+    topicId: q3.topicId,
+    topicLabel: q3.topicLabel,
+    question: q3.question,
+    correctAnswer: q3.answer,
+    userAnswer: wrongInput,
+    isCorrect: false,
+    steps: q3.steps,
+    markedAsGap: false
+  });
+
+  // Schritte werden als Kopie abgelegt
+  const entryDirect = createHistoryEntry(q1, checkAnswer(q1, String(q1.answer)));
+  q1.steps.push('nachträglich geändert');
+  assert.equal(h3[0].steps.includes('nachträglich geändert'), false);
+  assert.equal(entryDirect.steps.includes('nachträglich geändert'), false);
+
+  // setHistoryGap markiert und entmarkiert immutabel
+  const h4 = setHistoryGap(h3, 1, true);
+  assert.equal(h3[1].markedAsGap, false);
+  assert.equal(h4[0].markedAsGap, false);
+  assert.equal(h4[1].markedAsGap, true);
+  assert.equal(h4[2].markedAsGap, false);
+
+  const h5 = setHistoryGap(h4, 1, false);
+  assert.equal(h5[1].markedAsGap, false);
+
+  assert.equal(setHistoryGap(h4, -1, true).length, 3);
+  assert.equal(setHistoryGap(h4, 99, true)[1].markedAsGap, true);
+
+  // calculatePpm über verschiedene Zeitstufen (60, 120, 300, 600) und Randfälle
+  assert.equal(calculatePpm(15, 60), 15);
+  assert.equal(calculatePpm(25, 120), 12.5);
+  assert.equal(calculatePpm(45, 300), 9);
+  assert.equal(calculatePpm(105, 600), 10.5);
+  assert.equal(calculatePpm(1, 300), 0.2);
+  assert.equal(calculatePpm(11, 600), 1.1);
+  assert.equal(calculatePpm(7, 180), 2.3);
+  assert.equal(calculatePpm(5, 180), 1.7);
+  assert.equal(calculatePpm(12), 12);
+  assert.equal(calculatePpm(0, 60), 0);
+  assert.equal(calculatePpm(-3, 60), 0);
+  assert.equal(calculatePpm(10, 0), 0);
+  assert.equal(calculatePpm(10, -60), 0);
+
+  // summarizeSession über verschiedene Zeitstufen und für leere History
+  assert.deepEqual(summarizeSession(h3, 60), {
+    total: 3,
+    correctCount: 1,
+    wrongCount: 2,
+    accuracyPercent: 33,
+    ppm: 1,
+    durationSeconds: 60
+  });
+  assert.deepEqual(summarizeSession(h3, 120), {
+    total: 3,
+    correctCount: 1,
+    wrongCount: 2,
+    accuracyPercent: 33,
+    ppm: 0.5,
+    durationSeconds: 120
+  });
+  assert.deepEqual(summarizeSession(h3, 300), {
+    total: 3,
+    correctCount: 1,
+    wrongCount: 2,
+    accuracyPercent: 33,
+    ppm: 0.2,
+    durationSeconds: 300
+  });
+  assert.deepEqual(summarizeSession(h3, 600), {
+    total: 3,
+    correctCount: 1,
+    wrongCount: 2,
+    accuracyPercent: 33,
+    ppm: 0.1,
+    durationSeconds: 600
+  });
+  assert.deepEqual(summarizeSession([], 120), {
+    total: 0,
+    correctCount: 0,
+    wrongCount: 0,
+    accuracyPercent: 0,
+    ppm: 0,
+    durationSeconds: 120
+  });
 });
 ```
 
