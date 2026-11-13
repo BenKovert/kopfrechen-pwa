@@ -1,0 +1,19 @@
+{
+  "name": "Kopfrechnen 60s",
+  "short_name": "Kopfrechnen",
+  "description": "Schnelles 60-Sekunden-Kopfrechentraining für das iPhone.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "lang": "de",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
