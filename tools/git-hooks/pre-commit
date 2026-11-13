@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+node "$REPO_ROOT/tools/update-spiegel.mjs" --code
+git add "$REPO_ROOT/CODE_SPIEGEL.md"

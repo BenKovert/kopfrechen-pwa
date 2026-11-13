@@ -35,7 +35,7 @@ Die Anwendung ist eine leichtgewichtige Progressive Web App (PWA) für das iPhon
 - **`manifest.json`**: Web App Manifest für die Installation auf dem Homescreen (`display: "standalone"`, `orientation: "portrait"`, `start_url: "./index.html"`, Farben `#020617`).
 - **`icon.svg`**: Quadratisches Vektor-App-Icon (`512x512` mit `x²`-Motiv auf dunklem Grund).
 - **`CODE_SPIEGEL.md`**: Synchronisierter Volltext-Spiegel der Kerndateien im Projektordner für schnellen Kontextabgleich und externe Reviews. Wird vor jedem Commit automatisch über `tools/update-spiegel.mjs` aktualisiert.
-- **`tools/update-spiegel.mjs` & Git-Hooks**: Erstellt `CODE_SPIEGEL.md` neu (`--code`, eingebunden in `.git/hooks/pre-commit`) und spiegelt den Projektordner per `rsync` ohne `.git/` und `node_modules/` nach Google Drive (`--drive`, eingebunden in `.git/hooks/post-commit`). Zusätzlich läuft der zentrale Mac-Spiegel `drive-spiegel.sh` um 09:00 und 19:00 Uhr.
+- **`tools/update-spiegel.mjs` & Git-Hooks**: Erstellt `CODE_SPIEGEL.md` neu (`--code`, eingebunden in `.git/hooks/pre-commit`) und spiegelt den Projektordner per `rsync` ohne `.git/` und `node_modules/` nach Google Drive (`--drive`, eingebunden in `.git/hooks/post-commit`). Die versionierten Vorlagen bzw. Sicherheitskopien beider Hooks liegen in `tools/git-hooks/`. Zusätzlich läuft der zentrale Mac-Spiegel `drive-spiegel.sh` um 09:00 und 19:00 Uhr.
 - **`Start-Lokal.command`**: Ausführbarer Doppelklick-Starter für den macOS Finder. Wechselt in `/Users/benkovert/kopfrechen-pwa`, prüft Port `8080`, startet bei Bedarf `python3 -m http.server 8080` im Hintergrund und öffnet `http://localhost:8080` im Standardbrowser.
 
 ---
@@ -2023,6 +2023,7 @@ const BINARY_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '
 function languageForFile(relPath) {
   const base = path.basename(relPath);
   if (base === '.gitignore') return 'gitignore';
+  if (base === 'pre-commit' || base === 'post-commit') return 'bash';
   const ext = path.extname(relPath).toLowerCase();
   const map = {
     '.md': 'markdown',
@@ -2237,4 +2238,32 @@ fi
 
 echo "Öffne $URL im Standardbrowser..."
 open "$URL"
+```
+
+## tools/git-hooks/post-commit
+
+```bash
+#!/bin/sh
+set -e
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+node "$REPO_ROOT/tools/update-spiegel.mjs" --drive
+
+# Optional: automatischer Push im Hintergrund (aktivieren per: git config kopfrechen.autoPush true)
+if [ "$(git config --bool kopfrechen.autoPush 2>/dev/null || echo false)" = "true" ]; then
+  nohup git -C "$REPO_ROOT" push origin main >/dev/null 2>&1 &
+fi
+```
+
+## tools/git-hooks/pre-commit
+
+```bash
+#!/bin/sh
+set -e
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+node "$REPO_ROOT/tools/update-spiegel.mjs" --code
+git add "$REPO_ROOT/CODE_SPIEGEL.md"
 ```

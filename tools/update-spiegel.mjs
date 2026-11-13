@@ -38,6 +38,7 @@ const BINARY_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '
 function languageForFile(relPath) {
   const base = path.basename(relPath);
   if (base === '.gitignore') return 'gitignore';
+  if (base === 'pre-commit' || base === 'post-commit') return 'bash';
   const ext = path.extname(relPath).toLowerCase();
   const map = {
     '.md': 'markdown',

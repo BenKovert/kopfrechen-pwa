@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+node "$REPO_ROOT/tools/update-spiegel.mjs" --drive
+
+# Optional: automatischer Push im Hintergrund (aktivieren per: git config kopfrechen.autoPush true)
+if [ "$(git config --bool kopfrechen.autoPush 2>/dev/null || echo false)" = "true" ]; then
+  nohup git -C "$REPO_ROOT" push origin main >/dev/null 2>&1 &
+fi
